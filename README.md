@@ -62,13 +62,24 @@ AI:  Solid — you own this decision.
 
 ## Install
 
+**Homebrew:**
+```bash
+brew tap codersanket/tap
+brew install grasp
+```
+
+**npm:**
 ```bash
 npm install -g grasp-mcp
+```
+
+Then configure your project:
+```bash
 cd your-project
 grasp init
 ```
 
-That's it. `grasp init` auto-detects your AI tools and configures everything.
+`grasp init` auto-detects your AI tools and configures everything.
 
 ## How It Works
 
