@@ -1,6 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getChunksForTask, createCheck, getFamiliarity } from "../storage/queries.js";
+import { getChunksForTask, getTask, createCheck, getFamiliarity } from "../storage/queries.js";
+import { createLLMAdapter } from "../llm/adapter.js";
+import { generateQuestions } from "../engine/question-generator.js";
+import { getConfig } from "../config.js";
 
 export const checkSchema = {
   task_id: z.string().describe("The task ID to generate comprehension questions for"),
@@ -29,7 +32,10 @@ export function registerCheck(server: McpServer): void {
         };
       }
 
-      // Collect file paths for familiarity check
+      // Get task intent and familiarity
+      const task = getTask(task_id);
+      const intent = task?.intent ?? "unknown";
+
       const filePaths = [...new Set(relevantChunks.map((c) => c.file_path).filter(Boolean))] as string[];
       const familiarityData = getFamiliarity(filePaths);
       const avgFamiliarity =
@@ -37,9 +43,24 @@ export function registerCheck(server: McpServer): void {
           ? familiarityData.reduce((sum, f) => sum + f.score, 0) / familiarityData.length
           : 0;
 
-      // Stub: generate questions from chunk metadata
-      // Phase 3 will replace this with LLM-powered question generation
-      const questions = generateStubQuestions(relevantChunks, avgFamiliarity);
+      // Generate questions using LLM
+      let questions;
+      try {
+        const config = getConfig();
+        const llm = await createLLMAdapter(config.llm);
+        questions = await generateQuestions(llm, relevantChunks, {
+          intent,
+          familiarity: avgFamiliarity,
+        });
+      } catch (error) {
+        console.error("LLM unavailable, using fallback questions:", error);
+        // Import the fallback from the engine (it handles this internally)
+        questions = await generateQuestions(
+          { generate: async () => ({ text: "[]" }) },
+          relevantChunks,
+          { intent, familiarity: avgFamiliarity }
+        );
+      }
 
       // Store questions in DB
       const storedQuestions = questions.map((q) =>
@@ -56,57 +77,12 @@ export function registerCheck(server: McpServer): void {
                 question: q.question,
                 type: q.question_type,
               })),
-              message: "Present these questions naturally. If the developer answers correctly, great. If they skip or struggle, that's useful data too.",
+              message:
+                "Present these questions naturally in the conversation. They're not a quiz — they're the questions a good colleague would ask to make sure you own this code.",
             }),
           },
         ],
       };
     }
   );
-}
-
-interface StubQuestion {
-  question: string;
-  type: string;
-  expected_insight: string;
-  chunk_id?: string;
-}
-
-function generateStubQuestions(
-  chunks: Array<{ id: string; code: string; explanation: string; file_path: string | null }>,
-  familiarity: number
-): StubQuestion[] {
-  const questions: StubQuestion[] = [];
-
-  // Fewer questions for familiar areas
-  const maxQuestions = familiarity > 70 ? 1 : familiarity > 40 ? 2 : 3;
-
-  for (const chunk of chunks.slice(0, maxQuestions)) {
-    const lines = chunk.code.split("\n").length;
-
-    if (lines > 20) {
-      questions.push({
-        question: `This chunk is ${lines} lines. Can you walk through the main flow and explain what happens at each step?`,
-        type: "walkthrough",
-        expected_insight: "Developer should be able to trace the execution path",
-        chunk_id: chunk.id,
-      });
-    } else if (chunk.explanation) {
-      questions.push({
-        question: `The explanation mentions specific design decisions. Can you explain why this approach was chosen over alternatives?`,
-        type: "design_decision",
-        expected_insight: "Developer should understand the trade-offs",
-        chunk_id: chunk.id,
-      });
-    } else {
-      questions.push({
-        question: `What would happen if this code receives unexpected input? What edge cases should we consider?`,
-        type: "edge_case",
-        expected_insight: "Developer should identify potential failure modes",
-        chunk_id: chunk.id,
-      });
-    }
-  }
-
-  return questions;
 }
