@@ -64,8 +64,7 @@ AI:  Solid — you own this decision.
 
 **Homebrew:**
 ```bash
-brew tap codersanket/tap
-brew install grasp
+brew install codersanket/tap/grasp
 ```
 
 **npm:**
