@@ -1,14 +1,17 @@
 import { getDatabase } from "../storage/db.js";
-import { getChecksForTask, getChunksForTask } from "../storage/queries.js";
+import { getChecksForTask, getChunksForTask, getCoverage } from "../storage/queries.js";
 
 export interface ComprehensionScore {
   overall: number;
-  breakdown: {
-    quiz: number;
-    modification: number;
-    review_depth: number;
-    skip_rate: number;
-    streak: number;
+  coverage: {
+    ai_files: number;
+    files_with_context: number;
+    coverage_pct: number;
+  };
+  engagement: {
+    checks_answered: number;
+    checks_total: number;
+    engagement_pct: number;
   };
   raw: {
     questions_total: number;
@@ -18,56 +21,31 @@ export interface ComprehensionScore {
   };
 }
 
-const WEIGHTS = {
-  quiz: 0.35,
-  modification: 0.25,
-  review_depth: 0.2,
-  skip_rate: 0.15,
-  streak: 0.05,
-};
-
 export function calculateTaskScore(taskId: string): ComprehensionScore {
   const checks = getChecksForTask(taskId);
   const chunks = getChunksForTask(taskId);
+  const coverage = getCoverage();
 
-  // Exclude abandoned checks (never answered, not skipped) — these are orphaned placeholders
   const activeChecks = checks.filter((c) => c.developer_answer !== null || c.skipped === 1);
   const totalQuestions = activeChecks.length;
   const answered = activeChecks.filter((c) => c.developer_answer !== null && c.skipped !== 1);
   const passed = activeChecks.filter((c) => c.score !== null && c.score > 0.5);
   const skipped = activeChecks.filter((c) => c.skipped === 1);
 
-  // Quiz pass rate: correct / total
-  const quiz = totalQuestions > 0 ? (passed.length / totalQuestions) * 100 : 0;
+  // If no checks exist (high familiarity skipped them), engagement = 100
+  const engagementPct = totalQuestions > 0
+    ? Math.round((answered.length / totalQuestions) * 100)
+    : 100;
 
-  // Modification rate: 0 when no data, scales with answered questions
-  const modification = totalQuestions > 0 ? (answered.length / totalQuestions) * 100 : 0;
-
-  // Review depth: answered questions / total chunks
-  const reviewDepth = chunks.length > 0 ? Math.min(100, (answered.length / chunks.length) * 100) : 0;
-
-  // Skip rate inverse: 1 - (skipped / total). 0 when no questions (not 100)
-  const skipRate = totalQuestions > 0 ? (1 - skipped.length / totalQuestions) * 100 : 0;
-
-  // Engagement: based on answer rate across all chunks
-  const streak = chunks.length > 0 ? Math.min(100, (answered.length / chunks.length) * 100) : 0;
-
-  const overall = Math.round(
-    WEIGHTS.quiz * quiz +
-    WEIGHTS.modification * modification +
-    WEIGHTS.review_depth * reviewDepth +
-    WEIGHTS.skip_rate * skipRate +
-    WEIGHTS.streak * streak
-  );
+  const overall = Math.round(coverage.coverage_pct * 0.6 + engagementPct * 0.4);
 
   return {
     overall: Math.max(0, Math.min(100, overall)),
-    breakdown: {
-      quiz: Math.round(quiz),
-      modification: Math.round(modification),
-      review_depth: Math.round(reviewDepth),
-      skip_rate: Math.round(skipRate),
-      streak: Math.round(streak),
+    coverage,
+    engagement: {
+      checks_answered: answered.length,
+      checks_total: totalQuestions,
+      engagement_pct: engagementPct,
     },
     raw: {
       questions_total: totalQuestions,
@@ -80,7 +58,8 @@ export function calculateTaskScore(taskId: string): ComprehensionScore {
 
 export function calculateOverallScore(): ComprehensionScore {
   const db = getDatabase();
-  // Use SQL aggregation instead of loading all rows into memory
+  const coverage = getCoverage();
+
   const stats = db.prepare(
     `SELECT
        COUNT(*) as total,
@@ -93,38 +72,26 @@ export function calculateOverallScore(): ComprehensionScore {
   const allChunks = db.prepare("SELECT COUNT(*) as count FROM chunks").get() as { count: number };
 
   const totalQuestions = stats.total;
-  const answered = { length: stats.answered };
-  const passed = { length: stats.passed };
-  const skipped = { length: stats.skipped };
 
-  const quiz = totalQuestions > 0 ? (passed.length / totalQuestions) * 100 : 0;
-  const modification = totalQuestions > 0 ? (answered.length / totalQuestions) * 100 : 0;
-  const reviewDepth =
-    allChunks.count > 0 ? Math.min(100, (answered.length / allChunks.count) * 100) : 0;
-  const skipRate = totalQuestions > 0 ? (1 - skipped.length / totalQuestions) * 100 : 0;
-  const streak = allChunks.count > 0 ? Math.min(100, (answered.length / allChunks.count) * 100) : 0;
+  // If no checks exist (high familiarity skipped them), engagement = 100
+  const engagementPct = totalQuestions > 0
+    ? Math.round((stats.answered / totalQuestions) * 100)
+    : 100;
 
-  const overall = Math.round(
-    WEIGHTS.quiz * quiz +
-    WEIGHTS.modification * modification +
-    WEIGHTS.review_depth * reviewDepth +
-    WEIGHTS.skip_rate * skipRate +
-    WEIGHTS.streak * streak
-  );
+  const overall = Math.round(coverage.coverage_pct * 0.6 + engagementPct * 0.4);
 
   return {
     overall: Math.max(0, Math.min(100, overall)),
-    breakdown: {
-      quiz: Math.round(quiz),
-      modification: Math.round(modification),
-      review_depth: Math.round(reviewDepth),
-      skip_rate: Math.round(skipRate),
-      streak: Math.round(streak),
+    coverage,
+    engagement: {
+      checks_answered: stats.answered,
+      checks_total: totalQuestions,
+      engagement_pct: engagementPct,
     },
     raw: {
       questions_total: totalQuestions,
-      questions_passed: passed.length,
-      questions_skipped: skipped.length,
+      questions_passed: stats.passed,
+      questions_skipped: stats.skipped,
       chunks_total: allChunks.count,
     },
   };
@@ -142,7 +109,7 @@ export function recordDailyScore(score: ComprehensionScore): void {
     score.overall,
     score.raw.questions_passed,
     score.raw.questions_skipped,
-    0, // chunks_modified — tracked in V0.2
+    0,
     score.raw.chunks_total
   );
 }

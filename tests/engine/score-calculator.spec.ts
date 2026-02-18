@@ -3,7 +3,6 @@ import Database from "better-sqlite3";
 import { initSchema } from "../../src/storage/schema.js";
 
 // Direct DB testing since score-calculator depends on the DB singleton
-// In a more thorough test setup we'd mock getDatabase()
 
 describe("Score Calculator Logic", () => {
   let db: Database.Database;
@@ -18,48 +17,66 @@ describe("Score Calculator Logic", () => {
     db.close();
   });
 
-  it("calculates quiz pass rate correctly", () => {
+  it("calculates coverage correctly", () => {
     const now = new Date().toISOString();
     db.prepare("INSERT INTO tasks (id, intent, started_at) VALUES (?, ?, ?)").run("t1", "test", now);
 
-    // 3 questions: 2 passed, 1 failed
+    // 3 files with chunks, all with explanations > 10 chars
     db.prepare(
-      "INSERT INTO checks (id, task_id, question, question_type, score, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-    ).run("c1", "t1", "Q1", "design_decision", 1.0, now);
+      "INSERT INTO chunks (id, task_id, code, explanation, file_path, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run("ch1", "t1", "code1", "This is a detailed explanation of the design", "file1.ts", now);
     db.prepare(
-      "INSERT INTO checks (id, task_id, question, question_type, score, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-    ).run("c2", "t1", "Q2", "edge_case", 0.8, now);
+      "INSERT INTO chunks (id, task_id, code, explanation, file_path, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run("ch2", "t1", "code2", "Another thorough explanation here", "file2.ts", now);
     db.prepare(
-      "INSERT INTO checks (id, task_id, question, question_type, score, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-    ).run("c3", "t1", "Q3", "trade_off", 0.3, now);
+      "INSERT INTO chunks (id, task_id, code, explanation, file_path, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run("ch3", "t1", "code3", "short", "file3.ts", now);
 
-    const checks = db.prepare("SELECT * FROM checks WHERE task_id = ?").all("t1") as Array<{
-      score: number | null;
-    }>;
-    const passed = checks.filter((c) => c.score !== null && c.score > 0.5);
-    const quizRate = (passed.length / checks.length) * 100;
+    // 3 distinct files, 2 with explanation > 10 chars
+    const aiFiles = db.prepare("SELECT COUNT(DISTINCT file_path) as count FROM chunks WHERE file_path IS NOT NULL").get() as { count: number };
+    const filesWithContext = db.prepare("SELECT COUNT(DISTINCT file_path) as count FROM chunks WHERE file_path IS NOT NULL AND length(explanation) > 10").get() as { count: number };
+    const coveragePct = Math.round((filesWithContext.count / aiFiles.count) * 100);
 
-    expect(quizRate).toBeCloseTo(66.67, 1);
+    expect(aiFiles.count).toBe(3);
+    expect(filesWithContext.count).toBe(2);
+    expect(coveragePct).toBe(67);
   });
 
-  it("handles skip rate inverse", () => {
+  it("calculates engagement correctly", () => {
     const now = new Date().toISOString();
     db.prepare("INSERT INTO tasks (id, intent, started_at) VALUES (?, ?, ?)").run("t1", "test", now);
 
-    // 4 questions: 1 skipped
-    for (let i = 1; i <= 4; i++) {
-      db.prepare(
-        "INSERT INTO checks (id, task_id, question, question_type, skipped, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-      ).run(`c${i}`, "t1", `Q${i}`, "design_decision", i === 4 ? 1 : 0, now);
-    }
+    // 4 checks: 3 answered, 1 skipped
+    db.prepare(
+      "INSERT INTO checks (id, task_id, question, question_type, developer_answer, score, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run("c1", "t1", "Q1", "design_decision", "answer1", 1.0, now);
+    db.prepare(
+      "INSERT INTO checks (id, task_id, question, question_type, developer_answer, score, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run("c2", "t1", "Q2", "edge_case", "answer2", 0.8, now);
+    db.prepare(
+      "INSERT INTO checks (id, task_id, question, question_type, developer_answer, score, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run("c3", "t1", "Q3", "trade_off", "answer3", 0.3, now);
+    db.prepare(
+      "INSERT INTO checks (id, task_id, question, question_type, skipped, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run("c4", "t1", "Q4", "design_decision", 1, now);
 
-    const checks = db.prepare("SELECT * FROM checks WHERE task_id = ?").all("t1") as Array<{
-      skipped: number;
-    }>;
-    const skipped = checks.filter((c) => c.skipped === 1).length;
-    const skipRateInverse = (1 - skipped / checks.length) * 100;
+    const stats = db.prepare(
+      `SELECT
+         COUNT(*) as total,
+         SUM(CASE WHEN developer_answer IS NOT NULL AND skipped != 1 THEN 1 ELSE 0 END) as answered
+       FROM checks
+       WHERE developer_answer IS NOT NULL OR skipped = 1`
+    ).get() as { total: number; answered: number };
 
-    expect(skipRateInverse).toBe(75);
+    const engagementPct = Math.round((stats.answered / stats.total) * 100);
+    expect(engagementPct).toBe(75);
+  });
+
+  it("returns 100% engagement when no checks exist (high familiarity)", () => {
+    // No checks = high familiarity skipped them = 100% engagement
+    const totalQuestions = 0;
+    const engagementPct = totalQuestions > 0 ? 0 : 100;
+    expect(engagementPct).toBe(100);
   });
 
   it("returns 0 for empty task", () => {

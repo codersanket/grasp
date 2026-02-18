@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getFamiliarity, getChunksByFilePath } from "../storage/queries.js";
+import { getRelativeTime } from "../utils/time.js";
 
 export const contextSchema = {
   file_paths: z.array(z.string()).describe("File paths to check developer familiarity for"),
@@ -48,17 +49,4 @@ Returns familiarity scores plus all stored design explanations from previous cod
       };
     }
   );
-}
-
-function getRelativeTime(isoString: string): string {
-  const now = Date.now();
-  const then = new Date(isoString).getTime();
-  const diffMs = Math.max(0, now - then);
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
 }

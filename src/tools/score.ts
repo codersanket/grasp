@@ -27,9 +27,11 @@ export function registerScore(server: McpServer): void {
                 scope: "task",
                 task_id,
                 score: score.overall,
-                breakdown: score.breakdown,
+                headline: `Coverage: ${score.coverage.coverage_pct}% of AI-generated files have design context (${score.coverage.files_with_context}/${score.coverage.ai_files} files)`,
+                coverage: score.coverage,
+                engagement: score.engagement,
                 raw: score.raw,
-                message: formatScoreMessage(score.overall, score.raw.questions_total),
+                message: formatScoreMessage(score.overall, score.coverage.coverage_pct),
               }),
             },
           ],
@@ -47,9 +49,11 @@ export function registerScore(server: McpServer): void {
             text: JSON.stringify({
               scope: "overall",
               score: score.overall,
-              breakdown: score.breakdown,
+              headline: `Coverage: ${score.coverage.coverage_pct}% of AI-generated files have design context (${score.coverage.files_with_context}/${score.coverage.ai_files} files)`,
+              coverage: score.coverage,
+              engagement: score.engagement,
               raw: score.raw,
-              message: formatScoreMessage(score.overall, score.raw.questions_total),
+              message: formatScoreMessage(score.overall, score.coverage.coverage_pct),
             }),
           },
         ],
@@ -58,8 +62,8 @@ export function registerScore(server: McpServer): void {
   );
 }
 
-function formatScoreMessage(score: number, totalQuestions: number): string {
-  if (totalQuestions === 0) return "No comprehension data yet. Start coding with Grasp to build your profile.";
+function formatScoreMessage(score: number, coveragePct: number): string {
+  if (coveragePct === 0) return "No comprehension data yet. Start coding with Grasp to build your profile.";
   if (score >= 80) return "Strong comprehension. You own this code.";
   if (score >= 60) return "Good understanding. Some areas could use deeper engagement.";
   if (score >= 40) return "Moderate comprehension. Consider slowing down on unfamiliar areas.";

@@ -13,6 +13,8 @@ import { generate as generateWindsurf } from "../src/init/generators/windsurf.js
 import { generate as generateGemini } from "../src/init/generators/gemini.js";
 import { calculateOverallScore } from "../src/engine/score-calculator.js";
 import { getDatabase } from "../src/storage/db.js";
+import { getFileHistory } from "../src/storage/queries.js";
+import { getRelativeTime } from "../src/utils/time.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -106,17 +108,37 @@ program
     const score = calculateOverallScore();
 
     console.log("\n  Grasp — Comprehension Score\n");
-    console.log(`  Overall: ${score.overall}/100\n`);
-    console.log("  Breakdown:");
-    console.log(`    Quiz pass rate:   ${score.breakdown.quiz}%`);
-    console.log(`    Modification:     ${score.breakdown.modification}%`);
-    console.log(`    Review depth:     ${score.breakdown.review_depth}%`);
-    console.log(`    Skip rate:        ${score.breakdown.skip_rate}% (inverse)`);
-    console.log(`    Engagement:       ${score.breakdown.streak}%`);
-    console.log(`\n  Raw data:`);
+    console.log(`  Coverage: ${score.coverage.coverage_pct}% of AI-generated files have design context (${score.coverage.files_with_context}/${score.coverage.ai_files} files)`);
+    console.log(`  Engagement: ${score.engagement.engagement_pct}% (${score.engagement.checks_answered}/${score.engagement.checks_total} checks answered)`);
+    console.log(`\n  Overall: ${score.overall}/100\n`);
+    console.log(`  Raw data:`);
     console.log(`    Questions: ${score.raw.questions_passed}/${score.raw.questions_total} passed`);
     console.log(`    Skipped: ${score.raw.questions_skipped}`);
     console.log(`    Code chunks tracked: ${score.raw.chunks_total}\n`);
+  });
+
+// ── grasp why ─────────────────────────────────────────────
+
+program
+  .command("why <file>")
+  .description("Show design decisions for a file")
+  .action(async (file: string) => {
+    getDatabase();
+    const history = getFileHistory(file);
+
+    if (history.chunks.length === 0) {
+      console.log(`\n  No design decisions recorded for ${file}.\n`);
+      return;
+    }
+
+    console.log(`\n  ${file}`);
+    console.log(`  Familiarity: ${Math.round(history.familiarity)}/100\n`);
+    console.log("  Design decisions:");
+    for (const chunk of history.chunks) {
+      const age = getRelativeTime(chunk.created_at);
+      console.log(`    - "${chunk.explanation}" (${age})`);
+    }
+    console.log("");
   });
 
 // ── grasp status ───────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { getDatabase } from "../storage/db.js";
-import { hasChunksForFile } from "../storage/queries.js";
+import { hasChunksForFile, getChunksByFilePath } from "../storage/queries.js";
 import { trackInteraction } from "../engine/familiarity-tracker.js";
+import { getRelativeTime } from "../utils/time.js";
 
 export interface HookEvent {
   session_id: string;
@@ -50,7 +51,7 @@ function handlePreToolUse(event: HookEvent): HookResponse {
         hookEventName: "PreToolUse",
         permissionDecision: "allow",
         additionalContext:
-          "Reminder: Call grasp_start_task before generating code to capture intent and enable comprehension tracking.",
+          "Reminder: Call grasp_log_chunk with explanation for each code block to capture design decisions.",
       },
     };
   }
@@ -59,36 +60,15 @@ function handlePreToolUse(event: HookEvent): HookResponse {
 }
 
 function handlePostToolUse(event: HookEvent): HookResponse {
-  if (!event.tool_name || !["Write", "Edit"].includes(event.tool_name)) {
-    return {};
+  if (!event.tool_name) return {};
+
+  // Handle Read events — surface stored design context
+  if (event.tool_name === "Read") {
+    return handlePostRead(event);
   }
 
-  // Check if there are unquestioned chunks
-  const db = getDatabase();
-  const recentTask = db
-    .prepare(
-      "SELECT id FROM tasks WHERE replace(replace(started_at, 'T', ' '), 'Z', '') > datetime('now', '-1 hour') AND completed_at IS NULL ORDER BY started_at DESC LIMIT 1"
-    )
-    .get() as { id: string } | undefined;
-
-  if (!recentTask) return {};
-
-  const uncheckChunks = db
-    .prepare(
-      `SELECT COUNT(*) as count FROM chunks c
-       WHERE c.task_id = ?
-       AND NOT EXISTS (SELECT 1 FROM checks ch WHERE ch.chunk_id = c.id)`
-    )
-    .get(recentTask.id) as { count: number };
-
-  if (uncheckChunks.count > 2) {
-    return {
-      hookSpecificOutput: {
-        hookEventName: "PostToolUse",
-        additionalContext:
-          "You've generated several code chunks without comprehension checks. Consider calling grasp_check to verify the developer understands the code.",
-      },
-    };
+  if (!["Write", "Edit"].includes(event.tool_name)) {
+    return {};
   }
 
   // Track modifications to AI-generated files
@@ -102,3 +82,30 @@ function handlePostToolUse(event: HookEvent): HookResponse {
 
   return {};
 }
+
+function handlePostRead(event: HookEvent): HookResponse {
+  const filePath =
+    (event.tool_input?.file_path as string) ??
+    (event.tool_input?.path as string);
+
+  if (!filePath || !hasChunksForFile(filePath)) {
+    return {};
+  }
+
+  const chunks = getChunksByFilePath([filePath]);
+  if (chunks.length === 0) return {};
+
+  const lines = [`Grasp context for ${filePath}:`];
+  for (const chunk of chunks) {
+    const age = getRelativeTime(chunk.created_at);
+    lines.push(`  - "${chunk.explanation}" (${age})`);
+  }
+
+  return {
+    hookSpecificOutput: {
+      hookEventName: "PostToolUse",
+      additionalContext: lines.join("\n"),
+    },
+  };
+}
+

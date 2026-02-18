@@ -64,19 +64,19 @@ export function generate(projectDir: string, protocolContent: string): Generated
 
   const hookConfig = generateHookConfig();
 
-  // Merge hook config — append to existing hooks if present
+  // Merge hook config — append to existing hooks if present, per-matcher deduplication
   const existingHooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
   const newHooks = hookConfig.hooks;
 
   for (const [eventName, hookEntries] of Object.entries(newHooks)) {
     const existing = (existingHooks[eventName] ?? []) as Array<{ matcher: string }>;
-    // Only add if no existing Grasp hook for this event
-    const hasGraspHook = existing.some(
-      (h) => h.matcher === "Write|Edit" && JSON.stringify(h).includes("grasp-hook")
-    );
-    if (!hasGraspHook) {
-      existingHooks[eventName] = [...existing, ...hookEntries];
-    }
+    const toAdd = (hookEntries as Array<{ matcher: string }>).filter((entry) => {
+      // Only add if no existing Grasp hook for this specific matcher
+      return !existing.some(
+        (h) => h.matcher === entry.matcher && JSON.stringify(h).includes("grasp-hook")
+      );
+    });
+    existingHooks[eventName] = [...existing, ...toAdd];
   }
 
   settings.hooks = existingHooks;

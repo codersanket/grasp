@@ -111,12 +111,12 @@ export async function rateLimitMiddleware(req, res, next) {
   });
   const scoreData = JSON.parse((scoreResult.content as any)[0].text);
   console.log(`     Overall: ${scoreData.score}/100`);
-  console.log(`     Breakdown:`);
-  console.log(`       Quiz: ${scoreData.breakdown.quiz}%`);
-  console.log(`       Review depth: ${scoreData.breakdown.review_depth}%`);
-  console.log(`       Skip rate: ${scoreData.breakdown.skip_rate}% (inverse)`);
+  console.log(`     Coverage: ${scoreData.coverage.coverage_pct}% (${scoreData.coverage.files_with_context}/${scoreData.coverage.ai_files} files)`);
+  console.log(`     Engagement: ${scoreData.engagement.engagement_pct}%`);
   assert(typeof scoreData.score === "number", "score should be a number");
   assert(scoreData.score >= 0 && scoreData.score <= 100, "score should be 0-100");
+  assert(scoreData.coverage, "should have coverage data");
+  assert(typeof scoreData.coverage.coverage_pct === "number", "coverage_pct should be a number");
 
   // Step 6: Check context/familiarity
   // grasp_context returns plain text, not JSON
@@ -130,7 +130,37 @@ export async function rateLimitMiddleware(req, res, next) {
   assert(contextText.includes("src/middleware/rate-limit.ts"), "should contain the file path");
   assert(contextText.includes("familiarity:"), "should contain familiarity score");
 
-  console.log("\n  All 6 tools working. Grasp is operational.\n");
+  // Step 7: Log chunk without task_id (auto-create)
+  console.log("\n  7. Logging chunk without task_id (auto-create)...");
+  const autoChunkResult = await client.callTool({
+    name: "grasp_log_chunk",
+    arguments: {
+      code: `export function validate(input: string) { return input.length > 0; }`,
+      explanation: "Simple validation — non-empty string check. No regex needed for this use case.",
+      file_path: "src/utils/validate.ts",
+    },
+  });
+  const autoChunkData = JSON.parse((autoChunkResult.content as any)[0].text);
+  console.log(`     Chunk ID: ${autoChunkData.chunk_id}`);
+  console.log(`     Task ID: ${autoChunkData.task_id}`);
+  console.log(`     Auto-created: ${autoChunkData.auto_created}`);
+  assert(autoChunkData.chunk_id, "chunk_id should exist");
+  assert(autoChunkData.task_id, "task_id should exist");
+  assert(autoChunkData.auto_created === true, "auto_created should be true");
+
+  // Step 8: grasp_why
+  console.log("\n  8. Looking up design decisions with grasp_why...");
+  const whyResult = await client.callTool({
+    name: "grasp_why",
+    arguments: { file_path: "src/middleware/rate-limit.ts" },
+  });
+  const whyText = (whyResult.content as any)[0].text as string;
+  console.log(`     Response: ${whyText.trim()}`);
+  assert(whyText.includes("src/middleware/rate-limit.ts"), "should contain file path");
+  assert(whyText.includes("Design decisions:"), "should contain design decisions header");
+  assert(whyText.includes("sliding window"), "should contain the explanation");
+
+  console.log("\n  All 8 tools working. Grasp v0.2 is operational.\n");
 
   await client.close();
   process.exit(0);

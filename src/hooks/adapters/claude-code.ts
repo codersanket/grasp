@@ -47,6 +47,16 @@ export function generateHookConfig(): HookConfig {
             },
           ],
         },
+        {
+          matcher: "Read",
+          hooks: [
+            {
+              type: "command",
+              command,
+              timeout: 10,
+            },
+          ],
+        },
       ],
     },
   };

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getDatabase } from "../storage/db.js";
-import { recordAnswer, recordSkip } from "../storage/queries.js";
+import { recordAnswer, recordSkip, completeTask } from "../storage/queries.js";
 import { trackInteraction } from "../engine/familiarity-tracker.js";
 
 export const recordSchema = {
@@ -74,6 +74,7 @@ IMPORTANT: You MUST evaluate the developer's answer by setting the 'quality' par
         if (check?.file_path) {
           trackInteraction(check.file_path, "skipped");
         }
+        maybeCompleteTask(db, check_id);
         return {
           content: [
             {
@@ -105,6 +106,8 @@ IMPORTANT: You MUST evaluate the developer's answer by setting the 'quality' par
         trackInteraction(check.file_path, score > 0.5 ? "answered_correctly" : "answered_incorrectly");
       }
 
+      maybeCompleteTask(db, check_id);
+
       return {
         content: [
           {
@@ -115,4 +118,23 @@ IMPORTANT: You MUST evaluate the developer's answer by setting the 'quality' par
       };
     }
   );
+}
+
+function maybeCompleteTask(db: ReturnType<typeof getDatabase>, checkId: string): void {
+  // Find the task for this check
+  const checkRow = db
+    .prepare("SELECT task_id FROM checks WHERE id = ?")
+    .get(checkId) as { task_id: string } | undefined;
+  if (!checkRow) return;
+
+  // Check if all checks for this task are resolved (answered or skipped)
+  const pending = db
+    .prepare(
+      "SELECT COUNT(*) as count FROM checks WHERE task_id = ? AND developer_answer IS NULL AND skipped = 0"
+    )
+    .get(checkRow.task_id) as { count: number };
+
+  if (pending.count === 0) {
+    completeTask(checkRow.task_id);
+  }
 }

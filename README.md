@@ -72,14 +72,15 @@ That's it. `grasp init` auto-detects your AI tools and configures everything.
 
 ## How It Works
 
-Grasp runs as an MCP server alongside your AI tool. It provides 6 tools that change how the AI behaves:
+Grasp runs as an MCP server alongside your AI tool. It provides 7 tools that change how the AI behaves:
 
-1. **Intent capture** — AI asks what you're building before generating
-2. **Chunked generation** — Code arrives in focused blocks, not walls of text
-3. **Design explanations** — AI explains *why*, not just *what*
-4. **Comprehension checks** — Questions about the actual code, like a good colleague would ask
-5. **Score tracking** — See what you understand and where your blind spots are
-6. **Familiarity memory** — Grasp remembers what you know, adapts accordingly
+1. **Design capture** — Every code block gets a "why" explanation via `grasp_log_chunk` (the core rule)
+2. **Intent capture** — AI asks what you're building before generating (recommended, auto-creates if skipped)
+3. **Smart checks** — Comprehension questions only when you're in unfamiliar territory (familiarity < 50)
+4. **Context on read** — When AI reads a file with stored decisions, they appear automatically
+5. **Coverage scoring** — "78% of AI files have design context" — meaningful, not arbitrary
+6. **Decision lookup** — `grasp why <file>` shows design decisions during review, debugging, or onboarding
+7. **Familiarity memory** — Grasp remembers what you know, adapts accordingly
 
 ## Supported Tools
 
@@ -96,14 +97,15 @@ Grasp runs as an MCP server alongside your AI tool. It provides 6 tools that cha
 ## Commands
 
 ```bash
-grasp init      # Auto-detect tools, configure everything
-grasp score     # Show your comprehension score
-grasp status    # Show which tools are configured
+grasp init          # Auto-detect tools, configure everything
+grasp score         # Show your comprehension score (coverage + engagement)
+grasp why <file>    # Show design decisions for any file
+grasp status        # Show which tools are configured
 ```
 
 Inside any AI chat:
 - Say **"grasp score"** to see your stats
-- Say **"full speed"** to skip checks for the current task
+- Say **"full speed"** or **"skip checks"** to skip questions for the current task
 
 ## Why Grasp Exists
 

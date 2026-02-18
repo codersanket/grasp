@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getChunksForTask, getTask, createCheck, getFamiliarity, completeTask } from "../storage/queries.js";
+import { getChunksForTask, getTask, createCheck, getFamiliarity } from "../storage/queries.js";
 
 export const checkSchema = {
   task_id: z.string().describe("The task ID to generate comprehension questions for"),
@@ -73,13 +73,23 @@ QUESTION GUIDELINES:
           ? familiarityData.reduce((sum, f) => sum + f.score, 0) / familiarityData.length
           : 0;
 
-      // Scale questions with code size, adjusted by familiarity
+      // High familiarity — skip questions, just capture design decisions
+      if (avgFamiliarity >= 50) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "High familiarity — no questions needed. Design decisions captured.",
+            },
+          ],
+        };
+      }
+
+      // Scale questions for 0-50 familiarity range
       const baseCount = Math.min(relevantChunks.length, 5);
       let questionCount: number;
-      if (avgFamiliarity > 70) {
-        questionCount = Math.ceil(baseCount * 0.3);
-      } else if (avgFamiliarity > 40) {
-        questionCount = Math.ceil(baseCount * 0.6);
+      if (avgFamiliarity > 30) {
+        questionCount = Math.ceil(baseCount * 0.5);
       } else {
         questionCount = baseCount;
       }
@@ -98,9 +108,6 @@ QUESTION GUIDELINES:
         );
         checkIds.push(check.id);
       }
-
-      // Mark task as complete (checks have been generated)
-      completeTask(task_id);
 
       // Pair each check_id with the chunk explanation it should be about
       const questions = checkIds.map((checkId, i) => {

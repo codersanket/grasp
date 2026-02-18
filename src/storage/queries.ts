@@ -206,6 +206,58 @@ export function updateFamiliarity(filePath: string, scoreDelta: number): Familia
   }
 }
 
+// ── Coverage ──────────────────────────────────────────────
+
+export interface Coverage {
+  ai_files: number;
+  files_with_context: number;
+  coverage_pct: number;
+}
+
+export function getCoverage(): Coverage {
+  const db = getDatabase();
+  const aiFiles = db
+    .prepare("SELECT COUNT(DISTINCT file_path) as count FROM chunks WHERE file_path IS NOT NULL")
+    .get() as { count: number };
+  const filesWithContext = db
+    .prepare("SELECT COUNT(DISTINCT file_path) as count FROM chunks WHERE file_path IS NOT NULL AND length(explanation) > 10")
+    .get() as { count: number };
+
+  const coveragePct = aiFiles.count > 0
+    ? Math.round((filesWithContext.count / aiFiles.count) * 100)
+    : 0;
+
+  return {
+    ai_files: aiFiles.count,
+    files_with_context: filesWithContext.count,
+    coverage_pct: coveragePct,
+  };
+}
+
+// ── File History ──────────────────────────────────────────
+
+export interface FileHistory {
+  file_path: string;
+  familiarity: number;
+  chunks: Chunk[];
+}
+
+export function getFileHistory(filePath: string): FileHistory {
+  const db = getDatabase();
+  const fam = db
+    .prepare("SELECT score FROM familiarity WHERE file_path = ?")
+    .get(filePath) as { score: number } | undefined;
+  const chunks = db
+    .prepare("SELECT * FROM chunks WHERE file_path = ? ORDER BY created_at DESC")
+    .all(filePath) as Chunk[];
+
+  return {
+    file_path: filePath,
+    familiarity: fam?.score ?? 0,
+    chunks,
+  };
+}
+
 // ── Score History ──────────────────────────────────────────
 
 export interface ScoreRecord {

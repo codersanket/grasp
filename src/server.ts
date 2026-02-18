@@ -9,6 +9,7 @@ import { registerCheck } from "./tools/check.js";
 import { registerRecord } from "./tools/record.js";
 import { registerScore } from "./tools/score.js";
 import { registerContext } from "./tools/context.js";
+import { registerWhy } from "./tools/why.js";
 
 function getVersion(): string {
   try {
@@ -36,6 +37,7 @@ export function createServer(): McpServer {
   registerRecord(server);
   registerScore(server);
   registerContext(server);
+  registerWhy(server);
 
   return server;
 }
