@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "description": "Know your code. Own your code. MCP server that ensures developers understand AI-generated code.",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "bin": {
-    "grasp-mcp": "./dist/index.js"
+    "grasp-mcp": "./dist/src/index.js",
+    "grasp": "./dist/bin/grasp.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/src/index.js dist/bin/grasp.js",
     "dev": "tsx src/index.ts",
     "test": "vitest",
     "test:run": "vitest run",
@@ -34,6 +35,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "better-sqlite3": "^11.0.0",
+    "commander": "^14.0.3",
     "zod": "^3.25.0"
   },
   "devDependencies": {
