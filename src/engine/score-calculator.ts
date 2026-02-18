@@ -30,26 +30,27 @@ export function calculateTaskScore(taskId: string): ComprehensionScore {
   const checks = getChecksForTask(taskId);
   const chunks = getChunksForTask(taskId);
 
-  const totalQuestions = checks.length;
-  const answered = checks.filter((c) => c.developer_answer !== null && c.skipped !== 1);
-  const passed = checks.filter((c) => c.score !== null && c.score > 0.5);
-  const skipped = checks.filter((c) => c.skipped === 1);
+  // Exclude abandoned checks (never answered, not skipped) — these are orphaned placeholders
+  const activeChecks = checks.filter((c) => c.developer_answer !== null || c.skipped === 1);
+  const totalQuestions = activeChecks.length;
+  const answered = activeChecks.filter((c) => c.developer_answer !== null && c.skipped !== 1);
+  const passed = activeChecks.filter((c) => c.score !== null && c.score > 0.5);
+  const skipped = activeChecks.filter((c) => c.skipped === 1);
 
   // Quiz pass rate: correct / total
   const quiz = totalQuestions > 0 ? (passed.length / totalQuestions) * 100 : 0;
 
-  // Modification rate: placeholder — in V0.2 we'll track actual edits
-  // For now, assume 50% (neutral) since we can't measure edits yet
-  const modification = 50;
+  // Modification rate: 0 when no data, scales with answered questions
+  const modification = totalQuestions > 0 ? (answered.length / totalQuestions) * 100 : 0;
 
   // Review depth: answered questions / total chunks
   const reviewDepth = chunks.length > 0 ? Math.min(100, (answered.length / chunks.length) * 100) : 0;
 
-  // Skip rate inverse: 1 - (skipped / total)
-  const skipRate = totalQuestions > 0 ? (1 - skipped.length / totalQuestions) * 100 : 100;
+  // Skip rate inverse: 1 - (skipped / total). 0 when no questions (not 100)
+  const skipRate = totalQuestions > 0 ? (1 - skipped.length / totalQuestions) * 100 : 0;
 
-  // Streak: placeholder — needs session tracking (Phase 5+)
-  const streak = 50;
+  // Engagement: based on answer rate across all chunks
+  const streak = chunks.length > 0 ? Math.min(100, (answered.length / chunks.length) * 100) : 0;
 
   const overall = Math.round(
     WEIGHTS.quiz * quiz +
@@ -79,24 +80,29 @@ export function calculateTaskScore(taskId: string): ComprehensionScore {
 
 export function calculateOverallScore(): ComprehensionScore {
   const db = getDatabase();
-  const allChecks = db.prepare("SELECT * FROM checks").all() as Array<{
-    score: number | null;
-    skipped: number;
-    developer_answer: string | null;
-  }>;
+  // Use SQL aggregation instead of loading all rows into memory
+  const stats = db.prepare(
+    `SELECT
+       COUNT(*) as total,
+       SUM(CASE WHEN developer_answer IS NOT NULL AND skipped != 1 THEN 1 ELSE 0 END) as answered,
+       SUM(CASE WHEN score IS NOT NULL AND score > 0.5 THEN 1 ELSE 0 END) as passed,
+       SUM(CASE WHEN skipped = 1 THEN 1 ELSE 0 END) as skipped
+     FROM checks
+     WHERE developer_answer IS NOT NULL OR skipped = 1`
+  ).get() as { total: number; answered: number; passed: number; skipped: number };
   const allChunks = db.prepare("SELECT COUNT(*) as count FROM chunks").get() as { count: number };
 
-  const totalQuestions = allChecks.length;
-  const answered = allChecks.filter((c) => c.developer_answer !== null && c.skipped !== 1);
-  const passed = allChecks.filter((c) => c.score !== null && c.score > 0.5);
-  const skipped = allChecks.filter((c) => c.skipped === 1);
+  const totalQuestions = stats.total;
+  const answered = { length: stats.answered };
+  const passed = { length: stats.passed };
+  const skipped = { length: stats.skipped };
 
   const quiz = totalQuestions > 0 ? (passed.length / totalQuestions) * 100 : 0;
-  const modification = 50;
+  const modification = totalQuestions > 0 ? (answered.length / totalQuestions) * 100 : 0;
   const reviewDepth =
     allChunks.count > 0 ? Math.min(100, (answered.length / allChunks.count) * 100) : 0;
-  const skipRate = totalQuestions > 0 ? (1 - skipped.length / totalQuestions) * 100 : 100;
-  const streak = 50;
+  const skipRate = totalQuestions > 0 ? (1 - skipped.length / totalQuestions) * 100 : 0;
+  const streak = allChunks.count > 0 ? Math.min(100, (answered.length / allChunks.count) * 100) : 0;
 
   const overall = Math.round(
     WEIGHTS.quiz * quiz +

@@ -12,9 +12,15 @@ export function generate(projectDir: string, protocolContent: string): Generated
 
   // 1. .cursor/mcp.json — register Grasp MCP server
   const mcpJsonPath = join(projectDir, ".cursor", "mcp.json");
-  const mcpConfig = existsSync(mcpJsonPath)
-    ? JSON.parse(readFileSync(mcpJsonPath, "utf-8"))
-    : { mcpServers: {} };
+  let mcpConfig: Record<string, any> = { mcpServers: {} };
+  if (existsSync(mcpJsonPath)) {
+    try {
+      mcpConfig = JSON.parse(readFileSync(mcpJsonPath, "utf-8"));
+    } catch {
+      // Malformed JSON — start fresh
+    }
+  }
+  mcpConfig.mcpServers ??= {};
 
   mcpConfig.mcpServers.grasp = {
     command: "npx",

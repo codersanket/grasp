@@ -19,10 +19,13 @@ const __dirname = dirname(__filename);
 
 const program = new Command();
 
+const pkgPath = join(__dirname, "..", "..", "package.json");
+const pkgVersion = existsSync(pkgPath) ? JSON.parse(readFileSync(pkgPath, "utf-8")).version : "0.0.0";
+
 program
   .name("grasp")
   .description("Know your code. Own your code.")
-  .version("0.1.0");
+  .version(pkgVersion);
 
 // ── grasp init ─────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { generateHookConfig } from "../../hooks/adapters/claude-code.js";
 
@@ -13,9 +13,15 @@ export function generate(projectDir: string, protocolContent: string): Generated
 
   // 1. .mcp.json — register Grasp MCP server
   const mcpJsonPath = join(projectDir, ".mcp.json");
-  const mcpConfig = existsSync(mcpJsonPath)
-    ? JSON.parse(readFileSync(mcpJsonPath, "utf-8"))
-    : { mcpServers: {} };
+  let mcpConfig: Record<string, any> = { mcpServers: {} };
+  if (existsSync(mcpJsonPath)) {
+    try {
+      mcpConfig = JSON.parse(readFileSync(mcpJsonPath, "utf-8"));
+    } catch {
+      // Malformed JSON — start fresh
+    }
+  }
+  mcpConfig.mcpServers ??= {};
 
   mcpConfig.mcpServers.grasp = {
     type: "stdio",
@@ -49,7 +55,11 @@ export function generate(projectDir: string, protocolContent: string): Generated
 
   let settings: Record<string, unknown> = {};
   if (existsSync(settingsPath)) {
-    settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    } catch {
+      // Malformed JSON — start fresh
+    }
   }
 
   const hookConfig = generateHookConfig();

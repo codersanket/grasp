@@ -77,7 +77,7 @@ function handlePostToolUse(event: HookEvent): HookResponse {
     .prepare(
       `SELECT COUNT(*) as count FROM chunks c
        WHERE c.task_id = ?
-       AND NOT EXISTS (SELECT 1 FROM checks ch WHERE ch.task_id = c.task_id)`
+       AND NOT EXISTS (SELECT 1 FROM checks ch WHERE ch.chunk_id = c.id)`
     )
     .get(recentTask.id) as { count: number };
 

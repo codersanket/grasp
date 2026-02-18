@@ -57,6 +57,18 @@ IMPORTANT: You MUST evaluate the developer's answer by setting the 'quality' par
         )
         .get(check_id) as { chunk_id: string | null; file_path: string | null } | undefined;
 
+      if (!check) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: check_id "${check_id}" not found.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
       if (skipped) {
         recordSkip(check_id);
         if (check?.file_path) {

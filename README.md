@@ -37,26 +37,25 @@ You: "Looks good" [accepts all, understands nothing]
 **After Grasp:**
 ```
 You: "Add rate limiting to the upload endpoint"
-AI:  Before I write this — rate limit per user, per IP, or global?
+AI:  [captures intent via grasp_start_task]
+     Before I write this — rate limit per user, per IP, or global?
 You: "Per user, 429 response, Redis"
 
-AI:  ━━━ Part 1: Token Bucket Core (14 lines) ━━━
-     [code]
-     Using sliding window over fixed window because fixed windows
-     allow burst traffic at boundaries. The MULTI/EXEC block ensures
-     atomicity.
+AI:  [logs chunk with explanation via grasp_log_chunk]
+     Here's the sliding window rate limiter using Redis...
+     [code — 14 lines]
 
-     ━━━ Part 2: Express Middleware (10 lines) ━━━
-     [code]
-     The fallback to in-memory when Redis is down means each instance
-     tracks separately — with 3 instances, effective limit becomes 3x.
+     [calls grasp_check — gets your first question]
+     Quick check: Why did I use a sliding window instead of a
+     fixed window approach here?
 
-     Quick check:
-     → If Redis goes down with 4 app instances, what's the effective limit?
-     → Should authenticated users get different limits?
+You: "Fixed windows allow burst traffic at boundaries."
+AI:  [records via grasp_record — correct]
+     Exactly. Next question: If Redis goes down with 4 app
+     instances, what's the effective rate limit?
 
-You: "4x the configured limit. Yes — auth users need higher limits."
-AI:  Exactly right. Adjusting for auth-aware limiting.
+You: "4x the configured limit since each instance tracks separately."
+AI:  Solid — you own this decision.
 ```
 
 **Same tool. Same interface. You just actually own the code.**
@@ -92,7 +91,7 @@ Grasp runs as an MCP server alongside your AI tool. It provides 6 tools that cha
 | GitHub Copilot | Full (MCP + Instructions) |
 | Windsurf | Full (MCP + Rules) |
 | Gemini CLI | Full (MCP + Rules) |
-| Cline / Roo Code | MCP only |
+| Cline / Roo Code | MCP only (manual setup) |
 
 ## Commands
 

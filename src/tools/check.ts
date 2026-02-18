@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getChunksForTask, getTask, createCheck, getFamiliarity } from "../storage/queries.js";
+import { getChunksForTask, getTask, createCheck, getFamiliarity, completeTask } from "../storage/queries.js";
 
 export const checkSchema = {
   task_id: z.string().describe("The task ID to generate comprehension questions for"),
@@ -34,6 +34,20 @@ QUESTION GUIDELINES:
 - Questions should feel like a colleague asking "hey, do you know why we did it this way?" not a quiz`,
     checkSchema,
     async ({ task_id, chunk_ids }) => {
+      // Validate task exists
+      const task = getTask(task_id);
+      if (!task) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: task_id "${task_id}" not found. Call grasp_start_task first.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
       const chunks = getChunksForTask(task_id);
       const relevantChunks = chunk_ids
         ? chunks.filter((c) => chunk_ids.includes(c.id))
@@ -50,9 +64,7 @@ QUESTION GUIDELINES:
         };
       }
 
-      // Get task intent and familiarity
-      const task = getTask(task_id);
-      const intent = task?.intent ?? "unknown";
+      const intent = task.intent;
 
       const filePaths = [...new Set(relevantChunks.map((c) => c.file_path).filter(Boolean))] as string[];
       const familiarityData = getFamiliarity(filePaths);
@@ -86,6 +98,9 @@ QUESTION GUIDELINES:
         );
         checkIds.push(check.id);
       }
+
+      // Mark task as complete (checks have been generated)
+      completeTask(task_id);
 
       // Pair each check_id with the chunk explanation it should be about
       const questions = checkIds.map((checkId, i) => {

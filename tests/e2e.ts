@@ -32,6 +32,8 @@ async function main() {
   const startData = JSON.parse((startResult.content as any)[0].text);
   console.log(`     Task ID: ${startData.task_id}`);
   console.log(`     Mode: ${startData.suggested_mode}`);
+  assert(startData.task_id, "task_id should exist");
+  assert(startData.suggested_mode, "suggested_mode should exist");
 
   // Step 2: Log a code chunk
   console.log("\n  2. Logging code chunk...");
@@ -66,34 +68,40 @@ export async function rateLimitMiddleware(req, res, next) {
   const chunkData = JSON.parse((chunkResult.content as any)[0].text);
   console.log(`     Chunk ID: ${chunkData.chunk_id}`);
   console.log(`     Logged: ${chunkData.logged}`);
+  assert(chunkData.chunk_id, "chunk_id should exist");
+  assert(chunkData.logged === true, "logged should be true");
 
   // Step 3: Generate comprehension questions
+  // grasp_check returns plain text, not JSON
   console.log("\n  3. Generating comprehension questions...");
   const checkResult = await client.callTool({
     name: "grasp_check",
     arguments: { task_id: startData.task_id },
   });
-  const checkData = JSON.parse((checkResult.content as any)[0].text);
-  console.log(`     Questions generated: ${checkData.questions.length}`);
-  for (const q of checkData.questions) {
-    console.log(`     - [${q.type}] ${q.question.substring(0, 80)}...`);
-  }
+  const checkText = (checkResult.content as any)[0].text as string;
+  console.log(`     Response preview: ${checkText.substring(0, 100)}...`);
 
-  // Step 4: Record an answer
-  if (checkData.questions.length > 0) {
-    console.log("\n  4. Recording answer...");
-    const recordResult = await client.callTool({
-      name: "grasp_record",
-      arguments: {
-        check_id: checkData.questions[0].id,
-        answer:
-          "Fixed windows allow burst traffic at the boundary — a user could make 10 requests at 0:59 and 10 more at 1:01. Sliding window prevents this by tracking the actual time window per request.",
-      },
-    });
-    const recordData = JSON.parse((recordResult.content as any)[0].text);
-    console.log(`     Recorded: ${recordData.recorded}`);
-    console.log(`     Score: ${recordData.score}`);
-  }
+  // Extract check_ids from the plain text response
+  const checkIdMatches = checkText.match(/\[check_id: ([^\]]+)\]/g);
+  assert(checkIdMatches && checkIdMatches.length > 0, "should have at least 1 check_id");
+  const checkIds = checkIdMatches!.map((m: string) => m.match(/\[check_id: ([^\]]+)\]/)![1]);
+  console.log(`     Questions generated: ${checkIds.length}`);
+  console.log(`     Check IDs: ${checkIds.join(", ")}`);
+
+  // Step 4: Record an answer with quality evaluation
+  console.log("\n  4. Recording answer...");
+  const recordResult = await client.callTool({
+    name: "grasp_record",
+    arguments: {
+      check_id: checkIds[0],
+      answer:
+        "Fixed windows allow burst traffic at the boundary — a user could make 10 requests at 0:59 and 10 more at 1:01. Sliding window prevents this by tracking the actual time window per request.",
+      quality: "correct",
+    },
+  });
+  const recordText = (recordResult.content as any)[0].text as string;
+  console.log(`     Response: ${recordText}`);
+  assert(recordText.length > 0, "should have a response message");
 
   // Step 5: Get score
   console.log("\n  5. Getting comprehension score...");
@@ -107,23 +115,31 @@ export async function rateLimitMiddleware(req, res, next) {
   console.log(`       Quiz: ${scoreData.breakdown.quiz}%`);
   console.log(`       Review depth: ${scoreData.breakdown.review_depth}%`);
   console.log(`       Skip rate: ${scoreData.breakdown.skip_rate}% (inverse)`);
+  assert(typeof scoreData.score === "number", "score should be a number");
+  assert(scoreData.score >= 0 && scoreData.score <= 100, "score should be 0-100");
 
   // Step 6: Check context/familiarity
+  // grasp_context returns plain text, not JSON
   console.log("\n  6. Checking familiarity...");
   const contextResult = await client.callTool({
     name: "grasp_context",
     arguments: { file_paths: ["src/middleware/rate-limit.ts"] },
   });
-  const contextData = JSON.parse((contextResult.content as any)[0].text);
-  console.log(
-    `     src/middleware/rate-limit.ts: score=${contextData.files["src/middleware/rate-limit.ts"].score}, interactions=${contextData.files["src/middleware/rate-limit.ts"].interactions}`
-  );
-  console.log(`     Recommendation: ${contextData.recommendation}`);
+  const contextText = (contextResult.content as any)[0].text as string;
+  console.log(`     Response: ${contextText.trim()}`);
+  assert(contextText.includes("src/middleware/rate-limit.ts"), "should contain the file path");
+  assert(contextText.includes("familiarity:"), "should contain familiarity score");
 
-  console.log("\n  All 6 tools working. Grasp V0.1 is operational.\n");
+  console.log("\n  All 6 tools working. Grasp is operational.\n");
 
   await client.close();
   process.exit(0);
+}
+
+function assert(condition: any, message: string): void {
+  if (!condition) {
+    throw new Error(`Assertion failed: ${message}`);
+  }
 }
 
 main().catch((err) => {
