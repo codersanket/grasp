@@ -1,6 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
 import { getDatabase } from "./storage/db.js";
+import { registerStartTask } from "./tools/start-task.js";
+import { registerLogChunk } from "./tools/log-chunk.js";
+import { registerCheck } from "./tools/check.js";
+import { registerRecord } from "./tools/record.js";
+import { registerScore } from "./tools/score.js";
+import { registerContext } from "./tools/context.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -9,37 +14,15 @@ export function createServer(): McpServer {
   });
 
   // Initialize database eagerly on server creation
-  const db = getDatabase();
+  getDatabase();
 
-  server.tool(
-    "grasp_ping",
-    "Check Grasp server status and database connection.",
-    {},
-    async () => {
-      const tables = db
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
-        .all() as { name: string }[];
-
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify(
-              {
-                status: "ok",
-                version: "0.1.0",
-                tables: tables.map((t) => t.name),
-              },
-              null,
-              2
-            ),
-          },
-        ],
-      };
-    }
-  );
+  // Register all tools
+  registerStartTask(server);
+  registerLogChunk(server);
+  registerCheck(server);
+  registerRecord(server);
+  registerScore(server);
+  registerContext(server);
 
   return server;
 }
