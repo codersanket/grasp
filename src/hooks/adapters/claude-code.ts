@@ -19,7 +19,9 @@ export interface HookConfig {
   };
 }
 
-export function generateHookConfig(graspHookPath: string): HookConfig {
+export function generateHookConfig(): HookConfig {
+  const command = "npx -y -p grasp-mcp grasp-hook";
+
   return {
     hooks: {
       PreToolUse: [
@@ -28,7 +30,7 @@ export function generateHookConfig(graspHookPath: string): HookConfig {
           hooks: [
             {
               type: "command",
-              command: graspHookPath,
+              command,
               timeout: 10,
             },
           ],
@@ -40,7 +42,7 @@ export function generateHookConfig(graspHookPath: string): HookConfig {
           hooks: [
             {
               type: "command",
-              command: graspHookPath,
+              command,
               timeout: 10,
             },
           ],

@@ -1,5 +1,6 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { generateHookConfig } from "../../hooks/adapters/claude-code.js";
 
 export interface GeneratedFile {
   path: string;
@@ -41,6 +42,39 @@ export function generate(projectDir: string, protocolContent: string): Generated
       merge: true,
     });
   }
+
+  // 3. .claude/settings.json — register hooks for enforcement
+  const claudeDir = join(projectDir, ".claude");
+  const settingsPath = join(claudeDir, "settings.json");
+
+  let settings: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+  }
+
+  const hookConfig = generateHookConfig();
+
+  // Merge hook config — append to existing hooks if present
+  const existingHooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
+  const newHooks = hookConfig.hooks;
+
+  for (const [eventName, hookEntries] of Object.entries(newHooks)) {
+    const existing = (existingHooks[eventName] ?? []) as Array<{ matcher: string }>;
+    // Only add if no existing Grasp hook for this event
+    const hasGraspHook = existing.some(
+      (h) => h.matcher === "Write|Edit" && JSON.stringify(h).includes("grasp-hook")
+    );
+    if (!hasGraspHook) {
+      existingHooks[eventName] = [...existing, ...hookEntries];
+    }
+  }
+
+  settings.hooks = existingHooks;
+
+  files.push({
+    path: settingsPath,
+    content: JSON.stringify(settings, null, 2),
+  });
 
   return files;
 }

@@ -17,15 +17,16 @@ async function main(): Promise<void> {
     const event = JSON.parse(input);
     const response = handleHookEvent(event);
 
-    if (response.systemMessage || response.hookSpecificOutput) {
+    // Only write JSON if there's actual content for Claude Code
+    if (response.hookSpecificOutput) {
       process.stdout.write(JSON.stringify(response));
     }
 
     process.exit(0);
   } catch (error) {
-    // Non-blocking error — don't disrupt the developer's workflow
+    // Exit 0 to not block the developer — log to stderr for verbose mode
     console.error("Grasp hook error:", error);
-    process.exit(1);
+    process.exit(0);
   }
 }
 

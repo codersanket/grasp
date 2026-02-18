@@ -10,12 +10,11 @@ export interface HookEvent {
 }
 
 export interface HookResponse {
-  continue: boolean;
-  systemMessage?: string;
   hookSpecificOutput?: {
     hookEventName: string;
     permissionDecision?: "allow" | "deny" | "ask";
     permissionDecisionReason?: string;
+    additionalContext?: string;
   };
 }
 
@@ -28,48 +27,51 @@ export function handleHookEvent(event: HookEvent): HookResponse {
     return handlePostToolUse(event);
   }
 
-  return { continue: true };
+  return {};
 }
 
 function handlePreToolUse(event: HookEvent): HookResponse {
   // Only check Write/Edit operations
   if (!event.tool_name || !["Write", "Edit"].includes(event.tool_name)) {
-    return { continue: true };
+    return {};
   }
 
   // Check if grasp_start_task was called in a recent task
   const db = getDatabase();
   const recentTask = db
     .prepare(
-      "SELECT id FROM tasks WHERE started_at > datetime('now', '-1 hour') ORDER BY started_at DESC LIMIT 1"
+      "SELECT id FROM tasks WHERE replace(replace(started_at, 'T', ' '), 'Z', '') > datetime('now', '-1 hour') ORDER BY started_at DESC LIMIT 1"
     )
     .get();
 
   if (!recentTask) {
     return {
-      continue: true,
-      systemMessage:
-        "Reminder: Call grasp_start_task before generating code to capture intent and enable comprehension tracking.",
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "allow",
+        additionalContext:
+          "Reminder: Call grasp_start_task before generating code to capture intent and enable comprehension tracking.",
+      },
     };
   }
 
-  return { continue: true };
+  return {};
 }
 
 function handlePostToolUse(event: HookEvent): HookResponse {
   if (!event.tool_name || !["Write", "Edit"].includes(event.tool_name)) {
-    return { continue: true };
+    return {};
   }
 
   // Check if there are unquestioned chunks
   const db = getDatabase();
   const recentTask = db
     .prepare(
-      "SELECT id FROM tasks WHERE started_at > datetime('now', '-1 hour') AND completed_at IS NULL ORDER BY started_at DESC LIMIT 1"
+      "SELECT id FROM tasks WHERE replace(replace(started_at, 'T', ' '), 'Z', '') > datetime('now', '-1 hour') AND completed_at IS NULL ORDER BY started_at DESC LIMIT 1"
     )
     .get() as { id: string } | undefined;
 
-  if (!recentTask) return { continue: true };
+  if (!recentTask) return {};
 
   const uncheckChunks = db
     .prepare(
@@ -81,9 +83,11 @@ function handlePostToolUse(event: HookEvent): HookResponse {
 
   if (uncheckChunks.count > 2) {
     return {
-      continue: true,
-      systemMessage:
-        "You've generated several code chunks without comprehension checks. Consider calling grasp_check to verify the developer understands the code.",
+      hookSpecificOutput: {
+        hookEventName: "PostToolUse",
+        additionalContext:
+          "You've generated several code chunks without comprehension checks. Consider calling grasp_check to verify the developer understands the code.",
+      },
     };
   }
 
@@ -96,5 +100,5 @@ function handlePostToolUse(event: HookEvent): HookResponse {
     trackInteraction(filePath, "modified");
   }
 
-  return { continue: true };
+  return {};
 }

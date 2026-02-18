@@ -1,15 +1,16 @@
 {
   "name": "grasp-mcp",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Know your code. Own your code. MCP server that ensures developers understand AI-generated code.",
   "type": "module",
   "main": "dist/src/index.js",
   "bin": {
     "grasp-mcp": "./dist/src/index.js",
-    "grasp": "./dist/bin/grasp.js"
+    "grasp": "./dist/bin/grasp.js",
+    "grasp-hook": "./dist/bin/grasp-hook.js"
   },
   "scripts": {
-    "build": "tsc && chmod +x dist/src/index.js dist/bin/grasp.js",
+    "build": "tsc && chmod +x dist/src/index.js dist/bin/grasp.js dist/bin/grasp-hook.js",
     "dev": "tsx src/index.ts",
     "test": "vitest",
     "test:run": "vitest run",
