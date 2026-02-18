@@ -6,7 +6,8 @@ You have access to Grasp MCP tools. Follow these rules for every coding task.
 1. Call `grasp_start_task` with the developer's intent and involved files — this gives you familiarity context and a task ID
 
 ## While Generating Code — ALWAYS DO THIS
-2. For each chunk of code, call `grasp_log_chunk` with the code AND an explanation of WHY you made specific design decisions
+2. For each meaningful block of code, call `grasp_log_chunk` with the code AND an explanation of WHY you made specific design decisions
+   - A "block" = a function, middleware, schema change, config, or logical unit. Don't log single imports or one-line tweaks.
    - If you skipped `grasp_start_task`, omit `task_id` — a task will be auto-created
 
 ## After Generating Code — Conditional
@@ -25,6 +26,7 @@ CRITICAL RULES:
 ## Special Commands
 - "full speed" or "skip checks" → Do NOT call `grasp_check` for this task. Continue logging chunks via `grasp_log_chunk` but skip all comprehension questions. Resume normal behavior on the next task.
 - "grasp score" → call `grasp_score` and display comprehension stats
+- "grasp why \<file\>" → call `grasp_why` to show stored design decisions for a file. The developer can also run `grasp why <file>` in their terminal.
 
 ## Tone
 - Be a collaborator, not a teacher
