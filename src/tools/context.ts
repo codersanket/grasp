@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getFamiliarity } from "../storage/queries.js";
+import { getFamiliarity, getChunksByFilePath } from "../storage/queries.js";
 
 export const contextSchema = {
   file_paths: z.array(z.string()).describe("File paths to check developer familiarity for"),
@@ -9,43 +9,55 @@ export const contextSchema = {
 export function registerContext(server: McpServer): void {
   server.tool(
     "grasp_context",
-    "Check the developer's familiarity with specific files. Call this before generating code to understand how much the developer knows about the files involved. Use the result to decide how much to explain.",
+    `Check the developer's familiarity with specific files AND retrieve past design decisions. Call this before generating code to understand what the developer knows, or when they ask "why was this written this way?" about existing code.
+
+Returns familiarity scores plus all stored design explanations from previous coding sessions. Present the explanations naturally — they're the "why" behind the code.`,
     contextSchema,
     async ({ file_paths }) => {
       const familiarity = getFamiliarity(file_paths);
-      const familiarityMap: Record<string, { score: number; interactions: number; last_seen: string | null }> = {};
+      const chunks = getChunksByFilePath(file_paths);
+
+      const lines: string[] = [];
 
       for (const path of file_paths) {
-        const data = familiarity.find((f) => f.file_path === path);
-        familiarityMap[path] = {
-          score: data?.score ?? 0,
-          interactions: data?.interactions ?? 0,
-          last_seen: data?.last_interaction ?? null,
-        };
-      }
+        const fam = familiarity.find((f) => f.file_path === path);
+        const fileChunks = chunks.filter((c) => c.file_path === path);
 
-      const avgScore =
-        file_paths.length > 0
-          ? Object.values(familiarityMap).reduce((sum, f) => sum + f.score, 0) / file_paths.length
-          : 0;
+        const score = fam?.score ?? 0;
+        const interactions = fam?.interactions ?? 0;
+        lines.push(`[${path}] familiarity: ${Math.round(score)}/100 | ${interactions} interactions`);
+
+        if (fileChunks.length > 0) {
+          for (const chunk of fileChunks) {
+            const age = getRelativeTime(chunk.created_at);
+            lines.push(`  - "${chunk.explanation}" (${age})`);
+          }
+        } else {
+          lines.push(`  - No design decisions recorded yet`);
+        }
+        lines.push(``);
+      }
 
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({
-              files: familiarityMap,
-              average_familiarity: Math.round(avgScore),
-              recommendation:
-                avgScore > 70
-                  ? "Developer knows this area. Generate efficiently."
-                  : avgScore > 40
-                    ? "Moderate familiarity. Explain key design decisions."
-                    : "Unfamiliar territory. Generate in small chunks, explain everything, ask comprehension questions.",
-            }),
+            text: lines.join("\n"),
           },
         ],
       };
     }
   );
+}
+
+function getRelativeTime(isoString: string): string {
+  const now = Date.now();
+  const then = new Date(isoString).getTime();
+  const diffMs = now - then;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
 }

@@ -1,4 +1,6 @@
 import { getDatabase } from "../storage/db.js";
+import { hasChunksForFile } from "../storage/queries.js";
+import { trackInteraction } from "../engine/familiarity-tracker.js";
 
 export interface HookEvent {
   session_id: string;
@@ -83,6 +85,15 @@ function handlePostToolUse(event: HookEvent): HookResponse {
       systemMessage:
         "You've generated several code chunks without comprehension checks. Consider calling grasp_check to verify the developer understands the code.",
     };
+  }
+
+  // Track modifications to AI-generated files
+  const filePath =
+    (event.tool_input?.file_path as string) ??
+    (event.tool_input?.path as string);
+
+  if (filePath && hasChunksForFile(filePath)) {
+    trackInteraction(filePath, "modified");
   }
 
   return { continue: true };

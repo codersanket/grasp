@@ -84,6 +84,24 @@ export function getChunksForTask(taskId: string): Chunk[] {
   return db.prepare("SELECT * FROM chunks WHERE task_id = ? ORDER BY created_at").all(taskId) as Chunk[];
 }
 
+export function getChunksByFilePath(filePaths: string[]): Chunk[] {
+  const db = getDatabase();
+  if (filePaths.length === 0) return [];
+
+  const placeholders = filePaths.map(() => "?").join(",");
+  return db
+    .prepare(`SELECT * FROM chunks WHERE file_path IN (${placeholders}) ORDER BY created_at DESC`)
+    .all(...filePaths) as Chunk[];
+}
+
+export function hasChunksForFile(filePath: string): boolean {
+  const db = getDatabase();
+  const result = db
+    .prepare("SELECT COUNT(*) as count FROM chunks WHERE file_path = ?")
+    .get(filePath) as { count: number };
+  return result.count > 0;
+}
+
 // ── Checks ─────────────────────────────────────────────────
 
 export interface Check {
