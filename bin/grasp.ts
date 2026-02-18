@@ -34,7 +34,7 @@ program
     console.log("\n  Grasp — Know your code. Own your code.\n");
 
     // Load protocol template
-    const templateDir = join(__dirname, "..", "templates");
+    const templateDir = join(__dirname, "..", "..", "templates");
     const protocolPath = join(templateDir, "protocol.md");
 
     if (!existsSync(protocolPath)) {
