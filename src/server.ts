@@ -10,6 +10,8 @@ import { registerRecord } from "./tools/record.js";
 import { registerScore } from "./tools/score.js";
 import { registerContext } from "./tools/context.js";
 import { registerWhy } from "./tools/why.js";
+import { registerDesignReview } from "./tools/design-review.js";
+import { registerRecordDesign } from "./tools/record-design.js";
 
 function getVersion(): string {
   try {
@@ -38,6 +40,8 @@ export function createServer(): McpServer {
   registerScore(server);
   registerContext(server);
   registerWhy(server);
+  registerDesignReview(server);
+  registerRecordDesign(server);
 
   return server;
 }

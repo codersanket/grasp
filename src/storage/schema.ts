@@ -42,6 +42,16 @@ export function initSchema(db: Database.Database): void {
       interactions INTEGER DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS design_reviews (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL REFERENCES tasks(id),
+      scope TEXT NOT NULL,
+      question TEXT NOT NULL DEFAULT 'pending_ai_generation',
+      developer_response TEXT,
+      file_paths TEXT,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS score_history (
       date TEXT PRIMARY KEY,
       overall_score REAL DEFAULT 0,

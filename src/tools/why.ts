@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getFileHistory } from "../storage/queries.js";
+import { getFileHistory, getDesignReviewsByFiles } from "../storage/queries.js";
 import { getRelativeTime } from "../utils/time.js";
 
 export const whySchema = {
@@ -36,6 +36,17 @@ export function registerWhy(server: McpServer): void {
       for (const chunk of history.chunks) {
         const age = getRelativeTime(chunk.created_at);
         lines.push(`  - "${chunk.explanation}" (${age})`);
+      }
+
+      const designReviews = getDesignReviewsByFiles([file_path]);
+      if (designReviews.length > 0) {
+        lines.push(``);
+        lines.push(`Design decisions discussed:`);
+        for (const review of designReviews) {
+          if (review.developer_response) {
+            lines.push(`  - [${review.scope}] ${review.developer_response}`);
+          }
+        }
       }
 
       return {

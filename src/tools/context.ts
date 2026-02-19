@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getFamiliarity, getChunksByFilePath } from "../storage/queries.js";
+import { getFamiliarity, getChunksByFilePath, getDesignReviewsByFiles } from "../storage/queries.js";
 import { getRelativeTime } from "../utils/time.js";
 
 export const contextSchema = {
@@ -36,6 +36,15 @@ Returns familiarity scores plus all stored design explanations from previous cod
         } else {
           lines.push(`  - No design decisions recorded yet`);
         }
+        const designReviews = getDesignReviewsByFiles([path]);
+        if (designReviews.length > 0) {
+          for (const review of designReviews) {
+            if (review.developer_response) {
+              lines.push(`  - [design: ${review.scope}] ${review.developer_response}`);
+            }
+          }
+        }
+
         lines.push(``);
       }
 

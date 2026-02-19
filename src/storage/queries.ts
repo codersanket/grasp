@@ -165,6 +165,73 @@ export function getChecksForTask(taskId: string): Check[] {
   return db.prepare("SELECT * FROM checks WHERE task_id = ? ORDER BY created_at").all(taskId) as Check[];
 }
 
+// ── Design Reviews ────────────────────────────────────────
+
+export interface DesignReview {
+  id: string;
+  task_id: string;
+  scope: string;
+  question: string;
+  developer_response: string | null;
+  file_paths: string | null;
+  created_at: string;
+}
+
+export function createDesignReview(taskId: string, scope: string, filePaths?: string[]): DesignReview {
+  const db = getDatabase();
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  const filePathsJson = filePaths ? JSON.stringify(filePaths) : null;
+
+  db.prepare(
+    "INSERT INTO design_reviews (id, task_id, scope, file_paths, created_at) VALUES (?, ?, ?, ?, ?)"
+  ).run(id, taskId, scope, filePathsJson, now);
+
+  return {
+    id,
+    task_id: taskId,
+    scope,
+    question: "pending_ai_generation",
+    developer_response: null,
+    file_paths: filePathsJson,
+    created_at: now,
+  };
+}
+
+export function recordDesignResponse(reviewId: string, response: string): void {
+  const db = getDatabase();
+  db.prepare("UPDATE design_reviews SET developer_response = ? WHERE id = ?").run(response, reviewId);
+}
+
+export function getDesignReviewsForTask(taskId: string): DesignReview[] {
+  const db = getDatabase();
+  return db.prepare("SELECT * FROM design_reviews WHERE task_id = ? ORDER BY created_at").all(taskId) as DesignReview[];
+}
+
+export function hasDesignReviewsForTask(taskId: string): boolean {
+  const db = getDatabase();
+  const result = db
+    .prepare("SELECT COUNT(*) as count FROM design_reviews WHERE task_id = ?")
+    .get(taskId) as { count: number };
+  return result.count > 0;
+}
+
+export function getDesignReviewsByFiles(filePaths: string[]): DesignReview[] {
+  const db = getDatabase();
+  if (filePaths.length === 0) return [];
+
+  const allReviews = db.prepare("SELECT * FROM design_reviews WHERE file_paths IS NOT NULL ORDER BY created_at DESC").all() as DesignReview[];
+  return allReviews.filter((review) => {
+    const reviewFiles: string[] = JSON.parse(review.file_paths!);
+    return reviewFiles.some((f) => filePaths.includes(f));
+  });
+}
+
+export function getDesignReviewById(id: string): DesignReview | undefined {
+  const db = getDatabase();
+  return db.prepare("SELECT * FROM design_reviews WHERE id = ?").get(id) as DesignReview | undefined;
+}
+
 // ── Familiarity ────────────────────────────────────────────
 
 export interface Familiarity {

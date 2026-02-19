@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getChunksForTask, getTask, createCheck, getFamiliarity } from "../storage/queries.js";
+import { getChunksForTask, getTask, createCheck, getFamiliarity, hasDesignReviewsForTask } from "../storage/queries.js";
 
 export const checkSchema = {
   task_id: z.string().describe("The task ID to generate comprehension questions for"),
@@ -45,6 +45,13 @@ QUESTION GUIDELINES:
             },
           ],
           isError: true,
+        };
+      }
+
+      // Skip post-code checks if design was already reviewed for this task
+      if (hasDesignReviewsForTask(task_id)) {
+        return {
+          content: [{ type: "text" as const, text: "Design was reviewed before implementation — no post-code questions needed." }],
         };
       }
 

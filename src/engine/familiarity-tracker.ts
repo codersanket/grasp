@@ -6,7 +6,8 @@ export type InteractionType =
   | "answered_correctly"
   | "answered_incorrectly"
   | "modified"
-  | "skipped";
+  | "skipped"
+  | "design_discussed";
 
 const SCORE_DELTAS: Record<InteractionType, number> = {
   generated: 1,
@@ -15,6 +16,7 @@ const SCORE_DELTAS: Record<InteractionType, number> = {
   answered_incorrectly: 1,
   modified: 4,
   skipped: -2,
+  design_discussed: 4,
 };
 
 export function trackInteraction(filePath: string, interaction: InteractionType): void {

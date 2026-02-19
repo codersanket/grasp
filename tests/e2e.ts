@@ -35,8 +35,41 @@ async function main() {
   assert(startData.task_id, "task_id should exist");
   assert(startData.suggested_mode, "suggested_mode should exist");
 
-  // Step 2: Log a code chunk
-  console.log("\n  2. Logging code chunk...");
+  // Step 2: Design review (low familiarity — new file)
+  console.log("\n  2. Running design review...");
+  const designResult = await client.callTool({
+    name: "grasp_design_review",
+    arguments: { task_id: startData.task_id },
+  });
+  const designText = (designResult.content as any)[0].text as string;
+  console.log(`     Response preview: ${designText.substring(0, 100)}...`);
+  assert(designText.includes("intent:"), "should contain intent");
+  assert(designText.includes("familiarity:"), "should contain familiarity");
+
+  // Extract design_review_ids
+  const drIdMatches = designText.match(/\[design_review_id: ([^\]]+)\]/g);
+  assert(drIdMatches && drIdMatches.length > 0, "should have at least 1 design_review_id");
+  const drIds = drIdMatches!.map((m: string) => m.match(/\[design_review_id: ([^\]]+)\]/)![1]);
+  console.log(`     Design review IDs: ${drIds.join(", ")}`);
+  console.log(`     Scopes: ${drIdMatches!.length}`);
+
+  // Step 2b: Record design responses
+  console.log("\n  2b. Recording design responses...");
+  for (const drId of drIds) {
+    const recordDesignResult = await client.callTool({
+      name: "grasp_record_design",
+      arguments: {
+        design_review_id: drId,
+        response: "Sounds good, let's go with that approach.",
+      },
+    });
+    const recordDesignText = (recordDesignResult.content as any)[0].text as string;
+    assert(recordDesignText.includes("Design decision recorded"), "should confirm recording");
+  }
+  console.log(`     Recorded ${drIds.length} design decisions`);
+
+  // Step 3: Log a code chunk
+  console.log("\n  3. Logging code chunk...");
   const chunkResult = await client.callTool({
     name: "grasp_log_chunk",
     arguments: {
@@ -71,37 +104,15 @@ export async function rateLimitMiddleware(req, res, next) {
   assert(chunkData.chunk_id, "chunk_id should exist");
   assert(chunkData.logged === true, "logged should be true");
 
-  // Step 3: Generate comprehension questions
-  // grasp_check returns plain text, not JSON
-  console.log("\n  3. Generating comprehension questions...");
+  // Step 4: grasp_check should skip because design was already reviewed
+  console.log("\n  4. Checking that grasp_check skips (design was reviewed)...");
   const checkResult = await client.callTool({
     name: "grasp_check",
     arguments: { task_id: startData.task_id },
   });
   const checkText = (checkResult.content as any)[0].text as string;
-  console.log(`     Response preview: ${checkText.substring(0, 100)}...`);
-
-  // Extract check_ids from the plain text response
-  const checkIdMatches = checkText.match(/\[check_id: ([^\]]+)\]/g);
-  assert(checkIdMatches && checkIdMatches.length > 0, "should have at least 1 check_id");
-  const checkIds = checkIdMatches!.map((m: string) => m.match(/\[check_id: ([^\]]+)\]/)![1]);
-  console.log(`     Questions generated: ${checkIds.length}`);
-  console.log(`     Check IDs: ${checkIds.join(", ")}`);
-
-  // Step 4: Record an answer with quality evaluation
-  console.log("\n  4. Recording answer...");
-  const recordResult = await client.callTool({
-    name: "grasp_record",
-    arguments: {
-      check_id: checkIds[0],
-      answer:
-        "Fixed windows allow burst traffic at the boundary — a user could make 10 requests at 0:59 and 10 more at 1:01. Sliding window prevents this by tracking the actual time window per request.",
-      quality: "correct",
-    },
-  });
-  const recordText = (recordResult.content as any)[0].text as string;
-  console.log(`     Response: ${recordText}`);
-  assert(recordText.length > 0, "should have a response message");
+  console.log(`     Response: ${checkText}`);
+  assert(checkText.includes("Design was reviewed"), "should skip post-code questions when design was reviewed");
 
   // Step 5: Get score
   console.log("\n  5. Getting comprehension score...");
@@ -159,8 +170,9 @@ export async function rateLimitMiddleware(req, res, next) {
   assert(whyText.includes("src/middleware/rate-limit.ts"), "should contain file path");
   assert(whyText.includes("Design decisions:"), "should contain design decisions header");
   assert(whyText.includes("sliding window"), "should contain the explanation");
+  assert(whyText.includes("Design decisions discussed:"), "should surface design review responses");
 
-  console.log("\n  All 8 tools working. Grasp v0.2 is operational.\n");
+  console.log("\n  All 10 tools working. Grasp v0.3 is operational.\n");
 
   await client.close();
   process.exit(0);
