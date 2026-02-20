@@ -7,8 +7,15 @@ export interface GeneratedFile {
   merge?: boolean;
 }
 
-export function generate(projectDir: string, protocolContent: string): GeneratedFile[] {
+export interface ServerCommand {
+  command: string;
+  args: string[];
+}
+
+export function generate(projectDir: string, protocolContent: string, serverCommand?: ServerCommand): GeneratedFile[] {
   const files: GeneratedFile[] = [];
+
+  const srv = serverCommand ?? { command: "npx", args: ["-y", "grasp-mcp"] };
 
   // 1. .cursor/mcp.json — register Grasp MCP server
   const mcpJsonPath = join(projectDir, ".cursor", "mcp.json");
@@ -23,8 +30,8 @@ export function generate(projectDir: string, protocolContent: string): Generated
   mcpConfig.mcpServers ??= {};
 
   mcpConfig.mcpServers.grasp = {
-    command: "npx",
-    args: ["-y", "grasp-mcp"],
+    command: srv.command,
+    args: srv.args,
   };
 
   files.push({

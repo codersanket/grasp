@@ -8,7 +8,7 @@ export interface GeneratedFile {
   merge?: boolean;
 }
 
-export function generate(projectDir: string, protocolContent: string): GeneratedFile[] {
+export function generate(projectDir: string, protocolContent: string, _serverCommand?: unknown): GeneratedFile[] {
   const files: GeneratedFile[] = [];
 
   const geminiMdPath = join(projectDir, "GEMINI.md");

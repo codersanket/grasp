@@ -61,8 +61,18 @@ program
       return;
     }
 
+    // Resolve the MCP server entry point from grasp's own install location
+    // __dirname = dist/bin, so go up two levels to package root, then dist/src/index.js
+    const packageRoot = join(__dirname, "..", "..");
+    const indexPath = join(packageRoot, "dist", "src", "index.js");
+    const serverCommand = existsSync(indexPath)
+      ? { command: "node", args: [indexPath] }
+      : { command: "npx", args: ["-y", "grasp-mcp"] };
+
+    console.log(`  Server: ${serverCommand.command} ${serverCommand.args.join(" ")}\n`);
+
     // Generate configs for each detected tool
-    const generators: Record<string, (dir: string, proto: string) => Array<{ path: string; content: string }>> = {
+    const generators: Record<string, (dir: string, proto: string, srv: typeof serverCommand) => Array<{ path: string; content: string }>> = {
       "claude-code": generateClaudeCode,
       cursor: generateCursor,
       codex: generateCodex,
@@ -78,7 +88,7 @@ program
       if (!generator) continue;
 
       console.log(`  ✓ ${formatToolName(tool.name)} detected`);
-      const files = generator(projectDir, protocol);
+      const files = generator(projectDir, protocol, serverCommand);
 
       for (const file of files) {
         mkdirSync(dirname(file.path), { recursive: true });
