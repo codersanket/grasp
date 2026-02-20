@@ -82,9 +82,11 @@ program
 
       for (const file of files) {
         mkdirSync(dirname(file.path), { recursive: true });
+        const existed = existsSync(file.path);
         writeFileSync(file.path, file.content, "utf-8");
         const relativePath = file.path.replace(projectDir + "/", "");
-        console.log(`    → ${relativePath}`);
+        const label = existed ? "updated" : "created";
+        console.log(`    → ${relativePath} (${label})`);
         filesWritten++;
       }
     }

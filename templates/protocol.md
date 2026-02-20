@@ -13,8 +13,16 @@ You have access to Grasp MCP tools. Follow these rules for every coding task.
 6. After all design questions: proceed to implementation.
 
 ## While Generating Code — ALWAYS DO THIS
-7. For each meaningful block of code, call `grasp_log_chunk` with the code AND a pseudocode explanation
-   - Write the explanation as a step-by-step pseudocode walkthrough, not prose. The developer should be able to scan it in 10 seconds.
+7. For each meaningful block of code, call `grasp_log_chunk` with the code AND a structured explanation in this EXACT format:
+   ```
+   WHAT: One-line summary of what this code does
+   HOW:
+     → Step one
+     → Step two
+     → Step three
+   WHY: Why this approach was chosen over alternatives
+   ```
+   - The WHAT/HOW/WHY format is mandatory — do NOT write prose paragraphs.
    - Explanations are shown to the developer later as a consolidated walkthrough when `grasp_check` is called.
    - A "block" = a function, middleware, schema change, config, or logical unit. Don't log single imports or one-line tweaks.
    - If you skipped `grasp_start_task`, omit `task_id` — a task will be auto-created

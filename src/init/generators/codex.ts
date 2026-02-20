@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { upsertProtocolSection } from "../protocol-section.js";
 
 export interface GeneratedFile {
   path: string;
@@ -10,17 +11,17 @@ export interface GeneratedFile {
 export function generate(projectDir: string, protocolContent: string): GeneratedFile[] {
   const files: GeneratedFile[] = [];
 
-  // AGENTS.md — add Grasp protocol section
+  // AGENTS.md — add or update Grasp protocol section
   const agentsMdPath = join(projectDir, "AGENTS.md");
   const existingContent = existsSync(agentsMdPath)
     ? readFileSync(agentsMdPath, "utf-8")
     : "";
 
-  if (!existingContent.includes("Grasp Protocol")) {
-    const graspSection = `\n\n${protocolContent}`;
+  const result = upsertProtocolSection(existingContent, protocolContent);
+  if (result.action !== "unchanged") {
     files.push({
       path: agentsMdPath,
-      content: existingContent + graspSection,
+      content: result.content,
       merge: true,
     });
   }

@@ -6,7 +6,7 @@ import { trackInteraction } from "../engine/familiarity-tracker.js";
 export const logChunkSchema = {
   task_id: z.string().optional().describe("The task ID from grasp_start_task. If omitted, a task is auto-created."),
   code: z.string().describe("The generated code chunk"),
-  explanation: z.string().describe("Explain this code in pseudocode format. Write a step-by-step walkthrough that a developer can scan in 10 seconds. Use indented pseudocode lines, not prose. Example:\n  1. Take snapshot of buffer\n  2. Clear buffer immediately (so new events queue into fresh buffer)\n  3. For each event → call mixpanel.track()\n  4. If MoEngage forwarding → also call moengage.trackEvent()\n  5. Clear persisted Hive box\n  WHY: Snapshot-then-clear prevents duplicate flushes if timer and batch-size trigger race."),
+  explanation: z.string().describe("Structured explanation in EXACTLY this format:\nWHAT: One-line summary of what this code does\nHOW:\n  → Step one\n  → Step two\n  → Step three\nWHY: Why this approach was chosen over alternatives\n\nExample:\nWHAT: Flush buffered analytics events to Mixpanel + MoEngage\nHOW:\n  → Snapshot buffer, then clear immediately (new events queue into fresh buffer)\n  → For each event → mixpanel.track()\n  → If MoEngage forwarding enabled → also moengage.trackEvent()\n  → Clear persisted Hive box\nWHY: Snapshot-then-clear prevents duplicate flushes if timer and batch-size trigger race"),
   file_path: z.string().optional().describe("Target file path for this code"),
   lines_start: z.number().optional().describe("Starting line number"),
   lines_end: z.number().optional().describe("Ending line number"),

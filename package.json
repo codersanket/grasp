@@ -1,6 +1,6 @@
 {
   "name": "grasp-mcp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Know your code. Own your code. MCP server that ensures developers understand AI-generated code.",
   "type": "module",
   "main": "dist/src/index.js",

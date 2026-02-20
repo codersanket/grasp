@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { generateHookConfig } from "../../hooks/adapters/claude-code.js";
+import { upsertProtocolSection } from "../protocol-section.js";
 
 export interface GeneratedFile {
   path: string;
@@ -34,17 +35,17 @@ export function generate(projectDir: string, protocolContent: string): Generated
     content: JSON.stringify(mcpConfig, null, 2),
   });
 
-  // 2. CLAUDE.md — add Grasp protocol rules
+  // 2. CLAUDE.md — add or update Grasp protocol rules
   const claudeMdPath = join(projectDir, "CLAUDE.md");
   const existingContent = existsSync(claudeMdPath)
     ? readFileSync(claudeMdPath, "utf-8")
     : "";
 
-  if (!existingContent.includes("Grasp Protocol")) {
-    const graspSection = `\n\n${protocolContent}`;
+  const result = upsertProtocolSection(existingContent, protocolContent);
+  if (result.action !== "unchanged") {
     files.push({
       path: claudeMdPath,
-      content: existingContent + graspSection,
+      content: result.content,
       merge: true,
     });
   }

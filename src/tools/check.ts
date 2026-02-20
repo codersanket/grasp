@@ -67,18 +67,40 @@ QUESTION GUIDELINES:
       }
 
       // Build consolidated walkthrough from all chunk explanations
+      // Group chunks by file for cleaner display
+      const fileGroups = new Map<string, typeof relevantChunks>();
+      for (const chunk of relevantChunks) {
+        const key = chunk.file_path ?? "unknown";
+        const group = fileGroups.get(key) ?? [];
+        group.push(chunk);
+        fileGroups.set(key, group);
+      }
+
+      const separator = "────────────────────────────────";
       const walkthroughLines: string[] = [
         "--- CODE WALKTHROUGH — SHOW THIS TO THE DEVELOPER ---",
-        `Here's what was built for: ${task.intent}`,
         "",
+        `## What was built: ${task.intent}`,
+        "",
+        separator,
       ];
-      for (const chunk of relevantChunks) {
-        const fileName = chunk.file_path?.split("/").pop() ?? "unknown";
-        walkthroughLines.push(`**${fileName}**`);
-        walkthroughLines.push(chunk.explanation);
+
+      for (const [filePath, fileChunks] of fileGroups) {
+        const fileName = filePath.split("/").pop() ?? "unknown";
+        const shortPath = filePath.split("/").slice(-3).join("/");
         walkthroughLines.push("");
+        walkthroughLines.push(`### ${fileName}`);
+        walkthroughLines.push(`\`${shortPath}\``);
+        walkthroughLines.push("");
+        for (const chunk of fileChunks) {
+          walkthroughLines.push(chunk.explanation);
+          walkthroughLines.push("");
+        }
+        walkthroughLines.push(separator);
       }
-      walkthroughLines.push("You MUST display this walkthrough to the developer before asking any questions.");
+
+      walkthroughLines.push("");
+      walkthroughLines.push("You MUST display this walkthrough to the developer EXACTLY as formatted above before asking any questions.");
 
       // Skip post-code checks if design was already reviewed for this task
       if (hasDesignReviewsForTask(task_id)) {
