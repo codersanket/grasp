@@ -24,10 +24,13 @@ This tool returns the task intent, familiarity level, and design review scopes. 
 
 THIS IS CRITICAL: Each question must be its own conversational turn. The developer is a collaborator in the design process, not a reviewer after the fact.
 
-SCOPE GUIDELINES:
-- "approach": Ask about the overall strategy — "I'm thinking of using X because Y. What do you think?"
-- "trade_offs": Ask about trade-offs — "This approach means Z. Are you comfortable with that?"
-- "edge_cases": Ask about edge cases — "What should happen when...?"`,
+SCOPE GUIDELINES — ask deep, quality questions, not surface-level ones:
+- "approach": Ask about the overall strategy and WHY — "I'm thinking of using X because Y. What do you think? Why not Z?"
+- "trade_offs": Ask about real consequences — "This approach means A but sacrifices B. In production, how would that affect your users?"
+- "edge_cases": Ask about failure modes and boundaries — "What should happen when X fails? What if the input is empty/huge/malformed?"
+- "debugging": Ask about observability — "If this breaks at 2am, how would you diagnose it? What would you look for in the logs?"
+
+IMPORTANT: These questions replace post-code comprehension checks. The goal is to ensure the developer deeply understands the design BEFORE code is written, so no questions are needed after. Ask fewer but harder questions.`,
     designReviewSchema,
     async ({ task_id }) => {
       const task = getTask(task_id);
@@ -58,9 +61,11 @@ SCOPE GUIDELINES:
         };
       }
 
-      // Determine scopes based on familiarity
+      // Determine scopes based on familiarity — fewer but deeper questions
       let scopes: string[];
-      if (avgFamiliarity <= 30) {
+      if (avgFamiliarity <= 20) {
+        scopes = ["approach", "trade_offs", "edge_cases", "debugging"];
+      } else if (avgFamiliarity <= 40) {
         scopes = ["approach", "trade_offs", "edge_cases"];
       } else {
         scopes = ["approach", "trade_offs"];

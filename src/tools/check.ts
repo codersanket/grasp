@@ -102,17 +102,13 @@ QUESTION GUIDELINES:
       walkthroughLines.push("");
       walkthroughLines.push("You MUST display this walkthrough to the developer EXACTLY as formatted above before asking any questions.");
 
-      // Skip post-code checks if design was already reviewed for this task
+      // Skip entirely if design was already reviewed — comprehension was established before code
       if (hasDesignReviewsForTask(task_id)) {
         return {
           content: [
             {
               type: "text" as const,
-              text: walkthroughLines.join("\n"),
-            },
-            {
-              type: "text" as const,
-              text: "Design was reviewed before implementation — no comprehension questions needed. Just show the walkthrough above.",
+              text: "Design was reviewed before implementation — comprehension check skipped. The developer already demonstrated understanding during design review. Give a brief summary of what was built and move on.",
             },
           ],
         };
