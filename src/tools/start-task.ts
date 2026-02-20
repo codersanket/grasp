@@ -26,6 +26,23 @@ export function registerStartTask(server: McpServer): void {
       const avgFamiliarity = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
       const suggestedMode = avgFamiliarity > 70 ? "full_speed" : "guided";
 
+      const directive =
+        suggestedMode === "guided"
+          ? [
+              "",
+              "--- MANDATORY NEXT STEP ---",
+              `You MUST call grasp_design_review(task_id: "${task.id}") BEFORE writing any code.`,
+              "Do NOT skip this step. Do NOT start generating code until design review is complete.",
+              "After design review, log every code block with grasp_log_chunk.",
+              `After all code is written, call grasp_check(task_id: "${task.id}") for comprehension questions.`,
+            ].join("\n")
+          : [
+              "",
+              "--- WORKFLOW REMINDER ---",
+              "Log every code block with grasp_log_chunk.",
+              `After all code is written, call grasp_check(task_id: "${task.id}") to verify comprehension.`,
+            ].join("\n");
+
       return {
         content: [
           {
@@ -34,11 +51,11 @@ export function registerStartTask(server: McpServer): void {
               task_id: task.id,
               suggested_mode: suggestedMode,
               familiarity: familiarityMap,
-              message:
-                suggestedMode === "guided"
-                  ? "Developer is in unfamiliar territory. Generate code in focused chunks, explain design decisions, and ask comprehension questions."
-                  : "Developer knows this area well. Generate efficiently but still log chunks for tracking.",
             }),
+          },
+          {
+            type: "text" as const,
+            text: directive,
           },
         ],
       };

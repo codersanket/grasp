@@ -37,13 +37,12 @@ function handlePreToolUse(event: HookEvent): HookResponse {
     return {};
   }
 
-  // Check if grasp_start_task was called in a recent task
   const db = getDatabase();
   const recentTask = db
     .prepare(
-      "SELECT id FROM tasks WHERE replace(replace(started_at, 'T', ' '), 'Z', '') > datetime('now', '-1 hour') ORDER BY started_at DESC LIMIT 1"
+      "SELECT id, files FROM tasks WHERE replace(replace(started_at, 'T', ' '), 'Z', '') > datetime('now', '-1 hour') ORDER BY started_at DESC LIMIT 1"
     )
-    .get();
+    .get() as { id: string; files: string | null } | undefined;
 
   if (!recentTask) {
     return {
@@ -52,6 +51,61 @@ function handlePreToolUse(event: HookEvent): HookResponse {
         permissionDecision: "allow",
         additionalContext:
           "Reminder: Call grasp_log_chunk with explanation for each code block to capture design decisions.",
+      },
+    };
+  }
+
+  const chunkCount = (db
+    .prepare("SELECT COUNT(*) as count FROM chunks WHERE task_id = ?")
+    .get(recentTask.id) as { count: number }).count;
+
+  const checkCount = (db
+    .prepare("SELECT COUNT(*) as count FROM checks WHERE task_id = ?")
+    .get(recentTask.id) as { count: number }).count;
+
+  const designReviewCount = (db
+    .prepare("SELECT COUNT(*) as count FROM design_reviews WHERE task_id = ?")
+    .get(recentTask.id) as { count: number }).count;
+
+  const reminders: string[] = [];
+
+  // Chunks logged but no checks and no design reviews — remind about grasp_check
+  if (chunkCount > 0 && checkCount === 0 && designReviewCount === 0) {
+    reminders.push(
+      `Reminder: Task ${recentTask.id} has ${chunkCount} code chunks logged but grasp_check has not been called. You MUST call grasp_check(task_id: "${recentTask.id}") after finishing code generation.`
+    );
+  }
+
+  // No code yet, no design review, low familiarity — remind about design review
+  if (chunkCount === 0 && designReviewCount === 0 && recentTask.files) {
+    try {
+      const filePaths: string[] = JSON.parse(recentTask.files);
+      if (filePaths.length > 0) {
+        const placeholders = filePaths.map(() => "?").join(",");
+        const famRows = db
+          .prepare(`SELECT score FROM familiarity WHERE file_path IN (${placeholders})`)
+          .all(...filePaths) as { score: number }[];
+        const avgFam = famRows.length > 0
+          ? famRows.reduce((sum, r) => sum + r.score, 0) / famRows.length
+          : 0;
+
+        if (avgFam < 50) {
+          reminders.push(
+            `Reminder: Familiarity is low (${Math.round(avgFam)}/100). You should call grasp_design_review(task_id: "${recentTask.id}") before writing code.`
+          );
+        }
+      }
+    } catch {
+      // Malformed files JSON — skip familiarity check
+    }
+  }
+
+  if (reminders.length > 0) {
+    return {
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "allow",
+        additionalContext: reminders.join("\n"),
       },
     };
   }

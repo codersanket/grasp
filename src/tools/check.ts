@@ -13,15 +13,19 @@ export function registerCheck(server: McpServer): void {
     `Generate comprehension questions about the code just written. Call this after generating code to verify the developer understands what was built and why.
 
 HOW THIS WORKS:
-This tool returns design explanations for the code chunks and check_ids. YOU (the AI) must:
-1. Read the explanations from the response
-2. Generate the specified number of questions yourself based on the design decisions
-3. Ask ONLY THE FIRST question, then STOP your response and WAIT for the developer to answer
-4. Do NOT ask all questions at once. Do NOT list them. Do NOT continue with summaries or other work.
+This tool returns two things:
+1. A "Code Walkthrough" section with pseudocode explanations for all chunks — you MUST show this to the developer as-is before asking questions.
+2. Check IDs paired with design explanations — use these to generate questions.
+
+STEP BY STEP:
+1. First, display the "Code Walkthrough" section to the developer exactly as returned. This is their consolidated view of everything that was built.
+2. Then generate questions based on the design decisions.
+3. Ask ONLY THE FIRST question, then STOP your response and WAIT for the developer to answer.
+4. Do NOT ask all questions at once. Do NOT list them. Do NOT continue with summaries.
 5. When the developer answers, call grasp_record with the check_id and their answer, then ask the NEXT question and STOP again.
 6. Repeat until all questions are answered.
 
-THIS IS CRITICAL: Each question must be its own conversational turn. You ask one question → stop → developer answers → you record + ask next → stop. This is a conversation, not a quiz.
+THIS IS CRITICAL: Show the walkthrough first, then one question per turn. This is a conversation, not a quiz.
 
 QUESTION GUIDELINES:
 - Ask about design decisions: why this approach over alternatives
@@ -29,8 +33,6 @@ QUESTION GUIDELINES:
 - Ask about edge cases: what could go wrong, what inputs would break it
 - Ask about debugging: if this breaks in production, how would they diagnose it
 - Do NOT ask trivia or syntax questions
-- If familiarity is high, ask nuanced trade-off questions
-- If familiarity is low, ask fundamental "why this approach" questions
 - Questions should feel like a colleague asking "hey, do you know why we did it this way?" not a quiz`,
     checkSchema,
     async ({ task_id, chunk_ids }) => {
@@ -45,13 +47,6 @@ QUESTION GUIDELINES:
             },
           ],
           isError: true,
-        };
-      }
-
-      // Skip post-code checks if design was already reviewed for this task
-      if (hasDesignReviewsForTask(task_id)) {
-        return {
-          content: [{ type: "text" as const, text: "Design was reviewed before implementation — no post-code questions needed." }],
         };
       }
 
@@ -71,6 +66,36 @@ QUESTION GUIDELINES:
         };
       }
 
+      // Build consolidated walkthrough from all chunk explanations
+      const walkthroughLines: string[] = [
+        "--- CODE WALKTHROUGH — SHOW THIS TO THE DEVELOPER ---",
+        `Here's what was built for: ${task.intent}`,
+        "",
+      ];
+      for (const chunk of relevantChunks) {
+        const fileName = chunk.file_path?.split("/").pop() ?? "unknown";
+        walkthroughLines.push(`**${fileName}**`);
+        walkthroughLines.push(chunk.explanation);
+        walkthroughLines.push("");
+      }
+      walkthroughLines.push("You MUST display this walkthrough to the developer before asking any questions.");
+
+      // Skip post-code checks if design was already reviewed for this task
+      if (hasDesignReviewsForTask(task_id)) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: walkthroughLines.join("\n"),
+            },
+            {
+              type: "text" as const,
+              text: "Design was reviewed before implementation — no comprehension questions needed. Just show the walkthrough above.",
+            },
+          ],
+        };
+      }
+
       const intent = task.intent;
 
       const filePaths = [...new Set(relevantChunks.map((c) => c.file_path).filter(Boolean))] as string[];
@@ -80,13 +105,17 @@ QUESTION GUIDELINES:
           ? familiarityData.reduce((sum, f) => sum + f.score, 0) / familiarityData.length
           : 0;
 
-      // High familiarity — skip questions, just capture design decisions
+      // High familiarity — skip questions, show walkthrough only
       if (avgFamiliarity >= 50) {
         return {
           content: [
             {
               type: "text" as const,
-              text: "High familiarity — no questions needed. Design decisions captured.",
+              text: walkthroughLines.join("\n"),
+            },
+            {
+              type: "text" as const,
+              text: "High familiarity — no questions needed. Just show the walkthrough above.",
             },
           ],
         };
@@ -126,12 +155,16 @@ QUESTION GUIDELINES:
         content: [
           {
             type: "text" as const,
+            text: walkthroughLines.join("\n"),
+          },
+          {
+            type: "text" as const,
             text: [
               `intent: ${intent}`,
               `familiarity: ${Math.round(avgFamiliarity)}/100`,
               `questions to ask: ${questionCount}`,
               ``,
-              `Ask ONE question at a time. STOP after each. Wait for answer. Call grasp_record. Then next.`,
+              `Show the walkthrough above FIRST. Then ask ONE question at a time. STOP after each. Wait for answer. Call grasp_record. Then next.`,
               ``,
               ...questions,
             ].join("\n"),
