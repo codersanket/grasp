@@ -9,14 +9,15 @@ You have access to Grasp MCP tools. Follow these rules for every coding task.
 
 ## Design Review — Before Writing Code — MANDATORY WHEN FAMILIARITY IS LOW
 2. If start_task returns low familiarity (≤ 50), you MUST call `grasp_design_review` with the task_id. Do NOT write code until design review is complete.
-3. When design review returns scopes: propose your approach, then ask ONE design question at a time
-4. Wait for the developer to answer. Do NOT ask multiple design questions at once.
-5. Call `grasp_record_design` with their response. Then ask the next design question and STOP.
-6. After all design questions: proceed to implementation.
-7. Design review questions should be deep and meaningful — ask about WHY, failure modes, debugging, and real consequences. Quality over quantity.
+3. When design review returns scopes: propose your approach, then ask ONE design question at a time.
+4. Wait for the developer to answer. Call `grasp_record_design` with their response.
+5. After all scopes are answered, show the **Design Recap** (summary of their answers) and a **pseudocode plan**.
+6. Then let the developer chat freely — they can ask questions, suggest changes, or discuss alternatives. Keep the conversation going.
+7. Only when the developer confirms ("looks good", "let's go", "start coding") → proceed to implementation.
+8. Do NOT rush to code. The design conversation is the most valuable part.
 
 ## While Generating Code — ALWAYS DO THIS
-8. For each meaningful block of code, call `grasp_log_chunk` with the code AND a structured explanation in this EXACT format:
+9. For each meaningful block of code, call `grasp_log_chunk` with the code AND a structured explanation in this EXACT format:
    ```
    WHAT: One-line summary of what this code does
    HOW:
@@ -30,12 +31,12 @@ You have access to Grasp MCP tools. Follow these rules for every coding task.
    - If you skipped `grasp_start_task`, omit `task_id` — a task will be auto-created
 
 ## After Generating Code
-9. Call `grasp_check` after generating code.
-   - If design review was completed → check is skipped automatically. Give a brief summary of what was built.
-   - If NO design review → check will return comprehension questions. Ask them ONE at a time.
-10. When `grasp_check` returns questions: ask ONLY the first question, then STOP your response completely.
-11. When the developer answers, call `grasp_record` with the check_id and their answer. Then ask the next question and STOP again.
-12. After all questions are answered, give a brief summary.
+10. Call `grasp_check` after generating code.
+    - If design review was completed → check is skipped automatically. Give a brief summary of what was built.
+    - If NO design review → check will return comprehension questions. Ask them ONE at a time.
+11. When `grasp_check` returns questions: ask ONLY the first question, then STOP your response completely.
+12. When the developer answers, call `grasp_record` with the check_id and their answer. Then ask the next question and STOP again.
+13. After all questions are answered, give a brief summary.
 
 CRITICAL RULES:
 - ALWAYS call `grasp_log_chunk` for every code block you generate. This is non-negotiable.

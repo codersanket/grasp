@@ -79,10 +79,10 @@ export function registerRecordDesign(server: McpServer): void {
         "",
         "---",
         "",
-        "## Next Steps",
+        "## What To Do Now",
         "",
-        "1. Show the developer the Design Recap above exactly as formatted.",
-        "2. Then show a **pseudocode plan** of what you will implement based on their answers. The pseudocode should be a clear, step-by-step outline — not actual code. Example:",
+        "1. Show the developer the Design Recap above.",
+        "2. Present a **pseudocode plan** — a step-by-step outline of what you'll build based on their answers. Not actual code. Example:",
         "   ```",
         "   1. Create OfflineQueue class",
         "      - Store pending transactions in Hive box",
@@ -92,8 +92,10 @@ export function registerRecordDesign(server: McpServer): void {
         "   3. Add retry logic with exponential backoff",
         "      - Max 3 retries → move to failed queue → notify user",
         "   ```",
-        "3. Ask the developer: \"Does this plan look right? Anything to change before I start coding?\"",
-        "4. Only after they confirm → proceed to implementation with `grasp_log_chunk`.",
+        "3. Then say: \"Want to change anything, or should I start coding?\"",
+        "4. Let the developer chat freely — they might ask questions, suggest changes, or want to discuss alternatives. Keep the conversation going until they're satisfied.",
+        "5. Only when the developer says something like \"looks good\", \"let's go\", \"start coding\", or otherwise confirms → proceed to implementation with `grasp_log_chunk`.",
+        "6. Do NOT rush to code. The design conversation is the most valuable part.",
       );
 
       return {

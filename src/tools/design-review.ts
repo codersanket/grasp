@@ -13,24 +13,24 @@ export function registerDesignReview(server: McpServer): void {
     `Discuss design decisions with the developer BEFORE writing code. Call this after grasp_start_task when familiarity is low.
 
 HOW THIS WORKS:
-This tool returns the task intent, familiarity level, and design review scopes. YOU (the AI) must:
+This tool returns the task intent, familiarity level, and 1-2 design review scopes. YOU (the AI) must:
 1. Read the intent and scopes from the response
-2. Propose your recommended approach first
-3. Ask ONE design question at a time based on the scope, then STOP your response
+2. Propose your recommended approach — explain what you'd build and why
+3. Ask ONE deep design question based on the scope, then STOP your response
 4. Wait for the developer to answer
 5. Call grasp_record_design with the design_review_id and their response
-6. Then ask the next design question and STOP again
-7. After all design questions are answered, proceed to implementation
+6. If there's a second scope, ask that question and STOP again
+7. After all scopes are answered, the tool returns a recap + asks you to present a pseudocode plan
+8. The developer can then chat freely — ask questions, suggest changes, iterate on the design
+9. Only when the developer says "looks good", "let's go", or confirms → proceed to implementation
 
-THIS IS CRITICAL: Each question must be its own conversational turn. The developer is a collaborator in the design process, not a reviewer after the fact.
+THIS IS CRITICAL: Keep it conversational. 1-2 focused questions, then open discussion. Not an interrogation.
 
-SCOPE GUIDELINES — ask deep, quality questions, not surface-level ones:
-- "approach": Ask about the overall strategy and WHY — "I'm thinking of using X because Y. What do you think? Why not Z?"
-- "trade_offs": Ask about real consequences — "This approach means A but sacrifices B. In production, how would that affect your users?"
-- "edge_cases": Ask about failure modes and boundaries — "What should happen when X fails? What if the input is empty/huge/malformed?"
-- "debugging": Ask about observability — "If this breaks at 2am, how would you diagnose it? What would you look for in the logs?"
+SCOPE GUIDELINES — one deep question per scope:
+- "approach": Propose your strategy and ask the key design decision — "I'm thinking X because Y. The main decision is Z — what's your take?"
+- "edge_cases": Ask about the one failure mode that matters most — "The biggest risk here is X. What should happen when that fails?"
 
-IMPORTANT: These questions replace post-code comprehension checks. The goal is to ensure the developer deeply understands the design BEFORE code is written, so no questions are needed after. Ask fewer but harder questions.`,
+IMPORTANT: These questions replace post-code comprehension checks. Fewer questions, higher quality. The pseudocode plan after is where the developer really engages with the design.`,
     designReviewSchema,
     async ({ task_id }) => {
       const task = getTask(task_id);
@@ -61,14 +61,12 @@ IMPORTANT: These questions replace post-code comprehension checks. The goal is t
         };
       }
 
-      // Determine scopes based on familiarity — fewer but deeper questions
+      // 1-2 focused questions — quality over quantity
       let scopes: string[];
       if (avgFamiliarity <= 20) {
-        scopes = ["approach", "trade_offs", "edge_cases", "debugging"];
-      } else if (avgFamiliarity <= 40) {
-        scopes = ["approach", "trade_offs", "edge_cases"];
+        scopes = ["approach", "edge_cases"];
       } else {
-        scopes = ["approach", "trade_offs"];
+        scopes = ["approach"];
       }
 
       // Create placeholder design reviews in DB
