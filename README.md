@@ -29,7 +29,7 @@ It transforms how your AI generates code:
 **Before Grasp:**
 ```
 You: "Add rate limiting to the upload endpoint"
-AI:  [85 lines dumped at once]
+AI:  [dumps 85 lines]
      "Let me know if you need changes."
 You: "Looks good" [accepts all, understands nothing]
 ```
@@ -37,28 +37,42 @@ You: "Looks good" [accepts all, understands nothing]
 **After Grasp:**
 ```
 You: "Add rate limiting to the upload endpoint"
-AI:  [captures intent via grasp_start_task]
-     Before I write this — rate limit per user, per IP, or global?
-You: "Per user, 429 response, Redis"
 
-AI:  [logs chunk with explanation via grasp_log_chunk]
-     Here's the sliding window rate limiter using Redis...
-     [code — 14 lines]
+── 1. Intent & Familiarity ──────────────────────────
+AI:  [grasp_start_task → familiarity: 12/100 → guided mode]
+     You're unfamiliar with this area. Let's talk design first.
 
-     [calls grasp_check — gets your first question]
-     Quick check: Why did I use a sliding window instead of a
-     fixed window approach here?
+── 2. Design Review (before any code) ───────────────
+AI:  I'm thinking sliding window in Redis with per-user keys.
+     What should happen when Redis is down — fail open or fail closed?
+You: "Fail open. Better to let requests through than block everyone."
+AI:  Got it. What status code for rate-limited requests?
+You: "429 with a Retry-After header."
 
-You: "Fixed windows allow burst traffic at boundaries."
-AI:  [records via grasp_record — correct]
-     Exactly. Next question: If Redis goes down with 4 app
-     instances, what's the effective rate limit?
+── 3. Code with Explanations ────────────────────────
+AI:  [writes code, logs each block with grasp_log_chunk]
 
-You: "4x the configured limit since each instance tracks separately."
-AI:  Solid — you own this decision.
+     WHAT: Sliding window rate limiter middleware
+     HOW:
+       → Hash user ID into Redis key with TTL
+       → INCR + EXPIRE in a pipeline (atomic)
+       → If count > limit → 429 with Retry-After header
+       → If Redis unreachable → fail open (let request through)
+     WHY: Sliding window prevents burst traffic at window
+          boundaries that fixed windows allow
+
+     [code — 22 lines]
+
+── 4. Comprehension Check ──────────────────────────
+AI:  [grasp_check]
+     Why did we use INCR + EXPIRE in a pipeline instead of
+     a single SET with NX?
+You: "Pipeline makes the increment and TTL atomic — SET NX
+      would only set on first request and miss the count."
+AI:  Exactly. You own this code.
 ```
 
-**Same tool. Same interface. You just actually own the code.**
+**Same tool. Same interface. You just actually understand what you shipped.**
 
 ## Install
 
@@ -82,17 +96,25 @@ grasp init
 
 ## How It Works
 
-Grasp runs as an MCP server alongside your AI tool. It provides 10 tools that change how the AI behaves:
+Grasp runs as an MCP server alongside your AI tool. It provides 10 tools that follow a natural workflow:
 
-1. **Design capture** — Every code block gets a "why" explanation via `grasp_log_chunk` (the core rule)
-2. **Intent capture** — AI asks what you're building before generating (recommended, auto-creates if skipped)
-3. **Design review** — When familiarity is low, AI discusses approach with you before writing code
-4. **Smart checks** — Comprehension questions only when you're in unfamiliar territory (familiarity < 50)
-5. **Context on read** — When AI reads a file with stored decisions, they appear automatically
-6. **Coverage scoring** — "78% of AI files have design context" — meaningful, not arbitrary
-7. **Decision lookup** — `grasp why <file>` shows design decisions during review, debugging, or onboarding
-8. **Familiarity memory** — Grasp remembers what you know, adapts accordingly
+**Before code is written:**
+1. **Intent capture** — AI records what you're building and checks your familiarity with the files involved
+2. **Design review** — When familiarity is low, AI discusses the approach with you before writing a single line
+3. **Write protection** — AI is blocked from editing files until design review is complete (Claude Code hooks)
+
+**While code is generated:**
+4. **Design capture** — Every code block gets a structured WHAT/HOW/WHY explanation stored in a database
+5. **Context on read** — When AI reads a file with stored decisions, they surface automatically
+
+**After code is generated:**
+6. **Smart checks** — Comprehension questions only when you're in unfamiliar territory
+7. **Familiarity memory** — Grasp remembers what you know and adapts over time
+
+**Anytime:**
+8. **Decision lookup** — `grasp why <file>` shows why any AI-generated code was written the way it was
 9. **Codebase heatmap** — `grasp map` shows a color-coded tree of all AI-generated files by familiarity
+10. **Coverage scoring** — Track what percentage of your AI-generated codebase has design context
 
 ## Supported Tools
 
