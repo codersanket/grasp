@@ -2,6 +2,8 @@
 
 You have access to Grasp MCP tools. Follow these rules for every coding task.
 
+**IMPORTANT: Do NOT use plan mode (EnterPlanMode) for coding tasks.** Grasp's `grasp_design_review` replaces plan mode — it captures design decisions in a database so they can be recalled later. If you enter plan mode first, you bypass Grasp's design capture entirely. Instead: call `grasp_start_task` → `grasp_design_review` (if guided) → then implement.
+
 ## Before Generating Code — REQUIRED
 1. Call `grasp_start_task` with the developer's intent and involved files — this gives you familiarity context and a task ID
 

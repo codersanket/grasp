@@ -31,6 +31,7 @@ export function registerStartTask(server: McpServer): void {
           ? [
               "",
               "--- MANDATORY NEXT STEP ---",
+              "Do NOT enter plan mode. Do NOT call EnterPlanMode. Grasp design review replaces plan mode.",
               `You MUST call grasp_design_review(task_id: "${task.id}") BEFORE writing any code.`,
               "Do NOT skip this step. Do NOT start generating code until design review is complete.",
               "After design review, log every code block with grasp_log_chunk.",
@@ -39,6 +40,7 @@ export function registerStartTask(server: McpServer): void {
           : [
               "",
               "--- WORKFLOW REMINDER ---",
+              "Do NOT enter plan mode. Proceed directly to implementation.",
               "Log every code block with grasp_log_chunk.",
               `After all code is written, call grasp_check(task_id: "${task.id}") to verify comprehension.`,
             ].join("\n");
