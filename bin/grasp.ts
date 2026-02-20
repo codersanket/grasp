@@ -12,8 +12,9 @@ import { generate as generateCopilot } from "../src/init/generators/copilot.js";
 import { generate as generateWindsurf } from "../src/init/generators/windsurf.js";
 import { generate as generateGemini } from "../src/init/generators/gemini.js";
 import { calculateOverallScore } from "../src/engine/score-calculator.js";
+import { buildMap } from "../src/engine/map-builder.js";
 import { getDatabase } from "../src/storage/db.js";
-import { getFileHistory } from "../src/storage/queries.js";
+import { getFileHistory, getAllFileStats } from "../src/storage/queries.js";
 import { getRelativeTime } from "../src/utils/time.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -168,6 +169,26 @@ program
       console.log(`  ${icon} ${formatToolName(tool.name)}`);
     }
     console.log("");
+  });
+
+// ── grasp map ──────────────────────────────────────────────
+
+program
+  .command("map")
+  .description("Show color-coded familiarity map of AI-generated files")
+  .option("-s, --sort <by>", "Sort files by: name, score, recent", "name")
+  .option("--no-color", "Disable color output")
+  .action(async (opts: { sort: string; color: boolean }) => {
+    getDatabase();
+    const files = getAllFileStats();
+
+    if (files.length === 0) {
+      console.log("\n  No AI-generated files tracked yet. Start coding with Grasp.\n");
+      return;
+    }
+
+    const output = buildMap(files, { sort: opts.sort, color: opts.color });
+    console.log(output);
   });
 
 function formatToolName(name: string): string {

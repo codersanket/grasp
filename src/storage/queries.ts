@@ -325,6 +325,37 @@ export function getFileHistory(filePath: string): FileHistory {
   };
 }
 
+// ── Map Stats ─────────────────────────────────────────────
+
+export interface FileStats {
+  file_path: string;
+  familiarity: number;
+  chunk_count: number;
+  interactions: number;
+  last_interaction: string;
+  last_generated: string;
+}
+
+export function getAllFileStats(): FileStats[] {
+  const db = getDatabase();
+  return db
+    .prepare(
+      `SELECT
+        c.file_path,
+        COALESCE(f.score, 0) as familiarity,
+        COUNT(c.id) as chunk_count,
+        COALESCE(f.interactions, 0) as interactions,
+        COALESCE(f.last_interaction, '') as last_interaction,
+        MAX(c.created_at) as last_generated
+      FROM chunks c
+      LEFT JOIN familiarity f ON c.file_path = f.file_path
+      WHERE c.file_path IS NOT NULL
+      GROUP BY c.file_path
+      ORDER BY c.file_path`
+    )
+    .all() as FileStats[];
+}
+
 // ── Score History ──────────────────────────────────────────
 
 export interface ScoreRecord {

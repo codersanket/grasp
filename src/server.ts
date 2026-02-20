@@ -12,6 +12,7 @@ import { registerContext } from "./tools/context.js";
 import { registerWhy } from "./tools/why.js";
 import { registerDesignReview } from "./tools/design-review.js";
 import { registerRecordDesign } from "./tools/record-design.js";
+import { registerMap } from "./tools/map.js";
 
 function getVersion(): string {
   try {
@@ -42,6 +43,7 @@ export function createServer(): McpServer {
   registerWhy(server);
   registerDesignReview(server);
   registerRecordDesign(server);
+  registerMap(server);
 
   return server;
 }

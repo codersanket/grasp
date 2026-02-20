@@ -82,15 +82,17 @@ grasp init
 
 ## How It Works
 
-Grasp runs as an MCP server alongside your AI tool. It provides 7 tools that change how the AI behaves:
+Grasp runs as an MCP server alongside your AI tool. It provides 10 tools that change how the AI behaves:
 
 1. **Design capture** — Every code block gets a "why" explanation via `grasp_log_chunk` (the core rule)
 2. **Intent capture** — AI asks what you're building before generating (recommended, auto-creates if skipped)
-3. **Smart checks** — Comprehension questions only when you're in unfamiliar territory (familiarity < 50)
-4. **Context on read** — When AI reads a file with stored decisions, they appear automatically
-5. **Coverage scoring** — "78% of AI files have design context" — meaningful, not arbitrary
-6. **Decision lookup** — `grasp why <file>` shows design decisions during review, debugging, or onboarding
-7. **Familiarity memory** — Grasp remembers what you know, adapts accordingly
+3. **Design review** — When familiarity is low, AI discusses approach with you before writing code
+4. **Smart checks** — Comprehension questions only when you're in unfamiliar territory (familiarity < 50)
+5. **Context on read** — When AI reads a file with stored decisions, they appear automatically
+6. **Coverage scoring** — "78% of AI files have design context" — meaningful, not arbitrary
+7. **Decision lookup** — `grasp why <file>` shows design decisions during review, debugging, or onboarding
+8. **Familiarity memory** — Grasp remembers what you know, adapts accordingly
+9. **Codebase heatmap** — `grasp map` shows a color-coded tree of all AI-generated files by familiarity
 
 ## Supported Tools
 
@@ -110,8 +112,38 @@ Grasp runs as an MCP server alongside your AI tool. It provides 7 tools that cha
 grasp init          # Auto-detect tools, configure everything
 grasp score         # Show your comprehension score (coverage + engagement)
 grasp why <file>    # Show design decisions for any file
+grasp map           # Show color-coded familiarity heatmap of AI-generated files
 grasp status        # Show which tools are configured
 ```
+
+### `grasp map`
+
+See which AI-generated files you understand — and which ones you don't.
+
+```
+  Grasp — Codebase Familiarity Map
+
+  lib/
+  ├── presentation/upi/
+  │   ├── upi_receipt/
+  │   │   ├── upi_receipt_screen.dart        ██░░░░░░░░ 15/100  (3 chunks)
+  │   │   └── receipt_image_widget.dart       █░░░░░░░░░ 12/100  (2 chunks)
+  │   └── upi_transaction_history/
+  │       ├── upi_transaction_history_screen  ████████░░ 72/100  (3 chunks)
+  │       └── cubit/
+  │           ├── ...state.dart               ██████░░░░ 55/100  (1 chunk)
+  │           └── ...cubit.dart               ███████░░░ 68/100  (2 chunks)
+  └── data/core/router/
+      └── go_router_config.dart               ██████████ 90/100  (6 chunks)
+
+  6 AI-generated files | Avg familiarity: 52/100 | 2 files need attention (< 30)
+```
+
+- **Red** (0-30): You don't understand this code
+- **Yellow** (31-60): Partial understanding
+- **Green** (61-100): You own it
+
+Options: `--sort score|name|recent`, `--no-color`
 
 Inside any AI chat:
 - Say **"grasp score"** to see your stats
